@@ -1,0 +1,18 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build
+target/
+*.log
+
+# Allure
+allure-results/
+
+# Allure installation
+.allure/
+
+# OS
+.DS_Store
+Thumbs.db
