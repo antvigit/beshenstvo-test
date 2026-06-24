@@ -58,7 +58,7 @@ jobs:
             -F photo=@allure-report.png \
             -F caption="📊 Allure отчёт%0A🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # 2. Отправляем финальное сообщение с кнопкой "Повторить"
+          # 2. Отправляем финальное сообщение
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -d text="✅ Тесты завершены!%0A💡 Можете повторить запрос командой /run"
