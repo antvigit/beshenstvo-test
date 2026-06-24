@@ -10,6 +10,13 @@ REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
 WORKFLOW_ID = 'run-tests.yml'
 
+# ===== СБРОС ВЕБХУКА ПРИ ЗАПУСКЕ (УБИВАЕТ СТАРЫЕ СЕССИИ) =====
+try:
+    resp = requests.post(f'https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook')
+    print(f'✅ Webhook deleted: {resp.status_code} {resp.text}')
+except Exception as e:
+    print(f'❌ Failed to delete webhook: {e}')
+
 bot = telebot.TeleBot(BOT_TOKEN)
 
 def is_authorized(message):
@@ -64,4 +71,11 @@ def wait_for_result(message, name):
     bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
 if __name__ == "__main__":
+    # Ещё один сброс перед запуском polling (на всякий случай)
+    try:
+        bot.remove_webhook()
+        print("✅ Webhook removed before polling")
+    except Exception as e:
+        print(f"❌ Failed to remove webhook: {e}")
+
     bot.polling()
