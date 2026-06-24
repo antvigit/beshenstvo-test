@@ -1,7 +1,7 @@
 name: Run Tests
 
 on:
-  workflow_dispatch:  # Запуск вручную из бота или интерфейса GitHub
+  workflow_dispatch:
 
 jobs:
   test:
@@ -20,8 +20,21 @@ jobs:
       - name: Run tests
         run: mvn clean test
 
-      - name: Send result to Telegram
+      - name: Generate Allure report
+        run: mvn allure:report
+
+      - name: Install Playwright
         run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
-          -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-          -d text="✅ Тесты завершены! Отчёт: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          npm install -g playwright
+          playwright install
+
+      - name: Take screenshot of Allure report
+        run: |
+          npx playwright screenshot --viewport-size=1280,720 file://$PWD/target/site/allure-maven-plugin/index.html allure-report.png
+
+      - name: Send screenshot to Telegram
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
+            -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -F photo=@allure-report.png \
+            -F caption="📊 Отчёт Allure по результатам тестов"
