@@ -27,22 +27,26 @@ jobs:
             sleep 5
           done
 
-      - name: Start Allure server
+      - name: Generate Allure report
+        run: mvn allure:report
+
+      - name: Start Python HTTP server
         run: |
-          nohup mvn allure:serve &
-          sleep 15
-          curl -s http://localhost:8080 > /dev/null || echo "Allure server is running"
+          cd target/site/allure-maven-plugin/
+          python3 -m http.server 8080 &
+          sleep 5
 
       - name: Install Playwright
         run: |
           npm install -g playwright
           npx playwright install --with-deps chromium
 
-      - name: Take screenshot of Allure report
+      - name: Take screenshot
         run: |
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --timeout=15000 \
+            --timeout=20000 \
+            --wait-for-timeout=5000 \
             http://localhost:8080 \
             allure-report.png
 
