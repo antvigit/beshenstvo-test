@@ -27,11 +27,28 @@ jobs:
             sleep 5
           done
 
-      - name: Generate Allure report
-        run: mvn allure:report
-
-      - name: Send Allure report link to Telegram
+      - name: Start Allure server
         run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
-            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="📊 Allure отчёт: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          nohup mvn allure:serve &
+          sleep 15
+          curl -s http://localhost:8080 > /dev/null || echo "Allure server is running"
+
+      - name: Install Playwright
+        run: |
+          npm install -g playwright
+          npx playwright install --with-deps chromium
+
+      - name: Take screenshot of Allure report
+        run: |
+          npx playwright screenshot \
+            --viewport-size=1280,720 \
+            --timeout=15000 \
+            http://localhost:8080 \
+            allure-report.png
+
+      - name: Send screenshot to Telegram
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
+            -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -F photo=@allure-report.png \
+            -F caption="📊 Allure отчёт"
