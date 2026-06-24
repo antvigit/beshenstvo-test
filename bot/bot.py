@@ -12,7 +12,6 @@ WORKFLOW_ID = 'run-tests.yml'
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Проверка, что сообщение отправлено авторизованным пользователем
 def is_authorized(message):
     return str(message.chat.id) == CHAT_ID
 
