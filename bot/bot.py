@@ -10,22 +10,28 @@ REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
 WORKFLOW_ID = 'run-tests.yml'
 
-# ===== СБРОС ВЕБХУКА ПРИ СТАРТЕ =====
-try:
-    response = requests.post(f'https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook')
-    print('Webhook deleted:', response.status_code, response.text)
-except Exception as e:
-    print('Failed to delete webhook:', e)
-
 bot = telebot.TeleBot(BOT_TOKEN)
+
+# Проверка, что сообщение отправлено авторизованным пользователем
+def is_authorized(message):
+    return str(message.chat.id) == CHAT_ID
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "Привет! Напиши /run, чтобы запустить тесты.")
+    if not is_authorized(message):
+        bot.reply_to(message, "❌ У вас нет доступа к этому боту.")
+        return
+    name = message.from_user.first_name
+    bot.reply_to(message, f"Привет, {name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы запустить тесты.")
 
 @bot.message_handler(commands=['run'])
 def run_tests(message):
-    bot.reply_to(message, "🔄 Запускаю тесты...")
+    if not is_authorized(message):
+        bot.reply_to(message, "❌ У вас нет доступа к этому боту.")
+        return
+
+    name = message.from_user.first_name
+    bot.reply_to(message, f"🔄 {name}, запускаю тесты...")
 
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
     headers = {
@@ -39,10 +45,11 @@ def run_tests(message):
         bot.send_message(message.chat.id, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    bot.send_message(message.chat.id, "✅ Тесты запущены. Жду завершения...")
-    wait_for_result(message)
+    bot.send_message(message.chat.id, f"⏳ {name}, тесты запущены. Жду завершения...\nЭто может занять 2–3 минуты.")
 
-def wait_for_result(message):
+    wait_for_result(message, name)
+
+def wait_for_result(message, name):
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
 
@@ -52,11 +59,10 @@ def wait_for_result(message):
         runs = response.json()
 
         if runs.get('total_count', 0) == 0:
-            bot.send_message(message.chat.id, "✅ Тесты завершены!")
-            bot.send_message(message.chat.id, f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
+            bot.send_message(message.chat.id, f"📸 {name}, скриншот отчёта уже в пути...")
             return
 
-    bot.send_message(message.chat.id, "⏰ Тесты всё ещё выполняются. Проверь результат вручную.")
+    bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
 if __name__ == "__main__":
     bot.polling()
