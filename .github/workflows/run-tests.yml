@@ -20,6 +20,9 @@ jobs:
       - name: Run tests (always continue)
         run: mvn clean test || true
 
+      - name: Wait for Allure results (30 seconds)
+        run: sleep 30
+
       - name: Generate Allure report
         run: mvn allure:report
 
