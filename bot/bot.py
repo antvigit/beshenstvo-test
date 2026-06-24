@@ -10,6 +10,13 @@ REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
 WORKFLOW_ID = 'run-tests.yml'
 
+# ===== СБРОС ВЕБХУКА ПРИ СТАРТЕ =====
+try:
+    response = requests.post(f'https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook')
+    print('Webhook deleted:', response.status_code, response.text)
+except Exception as e:
+    print('Failed to delete webhook:', e)
+
 bot = telebot.TeleBot(BOT_TOKEN)
 
 @bot.message_handler(commands=['start'])
@@ -32,14 +39,14 @@ def run_tests(message):
         bot.send_message(message.chat.id, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    bot.send_message(message.chat.id, "✅ Тесты запущены. Жду завершения... (это может занять 2-3 минуты)")
+    bot.send_message(message.chat.id, "✅ Тесты запущены. Жду завершения...")
     wait_for_result(message)
 
 def wait_for_result(message):
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
 
-    for _ in range(30):  # 30 попыток по 10 секунд = 5 минут
+    for _ in range(30):
         time.sleep(10)
         response = requests.get(url, headers=headers)
         runs = response.json()
@@ -49,7 +56,7 @@ def wait_for_result(message):
             bot.send_message(message.chat.id, f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
             return
 
-    bot.send_message(message.chat.id, "⏰ Тесты всё ещё выполняются. Проверь результат вручную: https://github.com/antvigit/beshenstvo-test/actions")
+    bot.send_message(message.chat.id, "⏰ Тесты всё ещё выполняются. Проверь результат вручную.")
 
 if __name__ == "__main__":
     bot.polling()
