@@ -22,17 +22,25 @@ jobs:
 
       - name: Wait for Allure results
         run: |
-          while [ ! -d target/allure-results ] || [ -z "$(ls -A target/allure-results 2>/dev/null)" ]; do
-            echo "Waiting for allure-results..."
+          echo "Waiting for allure-results..."
+          for i in {1..30}; do
+            if [ -d target/allure-results ] && [ "$(ls -A target/allure-results 2>/dev/null)" ]; then
+              echo "✅ allure-results found!"
+              ls -la target/allure-results/
+              break
+            fi
+            echo "⏳ Waiting... (attempt $i)"
             sleep 5
           done
 
-      - name: Generate Allure report
-        run: mvn allure:report
-
-      - name: Start Python HTTP server
+      - name: Generate Allure report (standalone)
         run: |
-          cd target/site/allure-maven-plugin/
+          npm install -g allure-commandline
+          allure generate target/allure-results -o target/allure-report --clean
+
+      - name: Start HTTP server
+        run: |
+          cd target/allure-report
           python3 -m http.server 8080 &
           sleep 5
 
@@ -45,7 +53,7 @@ jobs:
         run: |
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --timeout=20000 \
+            --timeout=30000 \
             --wait-for-timeout=5000 \
             http://localhost:8080 \
             allure-report.png
