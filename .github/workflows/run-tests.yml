@@ -52,13 +52,18 @@ jobs:
 
       - name: Send screenshot + link + final message to Telegram
         run: |
-          # 1. Отправляем скриншот с подписью и ссылкой
+          # 1. Отправляем скриншот с подписью и ссылкой отдельно
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
             -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -F photo=@allure-report.png \
-            -F caption="📊 Allure отчёт%0A🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -F caption="📊 Allure отчёт"
 
-          # 2. Отправляем финальное сообщение
+          # 2. Отправляем ссылку отдельным сообщением
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="🔗 Ссылка на отчёт: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # 3. Отправляем финальное сообщение
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -d text="✅ Тесты завершены!%0A💡 Можете повторить запрос командой /run"
