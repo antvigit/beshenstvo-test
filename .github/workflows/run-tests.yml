@@ -30,16 +30,21 @@ jobs:
       - name: Generate Allure report
         run: mvn allure:report
 
-      - name: Install Playwright and browsers
+      - name: Send Allure report link to Telegram
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
+            -d text="📊 Allure отчёт: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Install Playwright
         run: |
           npm install -g playwright
           npx playwright install --with-deps chromium
 
-      - name: Take screenshot of Allure report after it's fully loaded
+      - name: Take screenshot of Allure report
         run: |
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --wait-for-selector=".chart-group" \
             file://$PWD/target/site/allure-maven-plugin/index.html \
             allure-report.png
 
@@ -48,4 +53,4 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
             -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -F photo=@allure-report.png \
-            -F caption="📊 Отчёт Allure по результатам тестов"
+            -F caption="📊 Скриншот Allure отчёта"
