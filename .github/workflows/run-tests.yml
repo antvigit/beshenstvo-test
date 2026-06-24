@@ -20,26 +20,28 @@ jobs:
       - name: Run tests (always continue)
         run: mvn clean test || true
 
-      - name: Wait for Allure results to be written
+      - name: Wait for Allure results
         run: |
-          echo "Waiting for allure-results directory..."
           while [ ! -d target/allure-results ] || [ -z "$(ls -A target/allure-results 2>/dev/null)" ]; do
-            echo "allure-results not ready yet... waiting 5 seconds"
+            echo "Waiting for allure-results..."
             sleep 5
           done
-          echo "allure-results found! Proceeding..."
 
       - name: Generate Allure report
         run: mvn allure:report
 
-      - name: Install Playwright
+      - name: Install Playwright and browsers
         run: |
           npm install -g playwright
-          playwright install
+          npx playwright install --with-deps chromium
 
-      - name: Take screenshot of Allure report
+      - name: Take screenshot of Allure report after it's fully loaded
         run: |
-          npx playwright screenshot --viewport-size=1280,720 file://$PWD/target/site/allure-maven-plugin/index.html allure-report.png
+          npx playwright screenshot \
+            --viewport-size=1280,720 \
+            --wait-for-selector=".chart-group" \
+            file://$PWD/target/site/allure-maven-plugin/index.html \
+            allure-report.png
 
       - name: Send screenshot to Telegram
         run: |
