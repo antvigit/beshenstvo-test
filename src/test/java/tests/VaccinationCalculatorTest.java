@@ -1,5 +1,6 @@
 package tests;
 
+import org.openqa.selenium.chrome.ChromeOptions;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import io.qameta.allure.Allure;
 import io.qameta.allure.Feature;
@@ -33,7 +34,15 @@ public class VaccinationCalculatorTest {
     @BeforeEach
     void setUp() {
         WebDriverManager.chromedriver().setup();
-        driver = new ChromeDriver();
+
+        ChromeOptions options = new ChromeOptions( );
+        options.addArguments("--headless=new");   // Безголовый режим
+        options.addArguments("--no-sandbox");
+        options.addArguments("--disable-dev-shm-usage");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--remote-debugging-port=9222");
+
+        driver = new ChromeDriver(options);
         driver.manage().window().maximize();
         page = new VaccinationPage(driver);
     }
