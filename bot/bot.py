@@ -2,7 +2,7 @@ import telebot
 import requests
 import os
 import time
-from flask import Flask, request
+from flask import Flask
 
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
@@ -64,14 +64,12 @@ def wait_for_result(message, name):
 
     bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return 'OK', 200
-    return 'Bad Request', 400
-
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+    # Удаляем старый вебхук, чтобы не мешал
+    bot.remove_webhook()
+    print("🤖 Бот запущен в режиме polling")
+    # Запускаем Flask в отдельном потоке для health check
+    import threading
+    threading.Thread(target=app.run, kwargs={'host': '0.0.0.0', 'port': int(os.environ.get('PORT', 5000))}, daemon=True).start()
+    # Запускаем polling
+    bot.polling()
