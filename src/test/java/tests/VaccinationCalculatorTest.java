@@ -12,6 +12,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import pages.VaccinationPage;
@@ -37,10 +38,27 @@ public class VaccinationCalculatorTest {
         String gridUrl = System.getProperty("grid.url");
 
         if (gridUrl != null && !gridUrl.isEmpty()) {
-            DesiredCapabilities caps = new DesiredCapabilities();
-            caps.setBrowserName(browser);
-            driver = new RemoteWebDriver(new URL(gridUrl), caps);
+            // Запуск через Selenium Grid
+            if (browser.equals("chrome")) {
+                ChromeOptions options = new ChromeOptions();
+                options.addArguments("--headless=new");
+                options.addArguments("--no-sandbox");
+                options.addArguments("--disable-dev-shm-usage");
+                options.addArguments("--disable-gpu");
+                options.addArguments("--remote-debugging-port=9222");
+                options.addArguments("--window-size=1920,1080");
+                driver = new RemoteWebDriver(new URL(gridUrl), options);
+            } else if (browser.equals("firefox")) {
+                FirefoxOptions options = new FirefoxOptions();
+                options.addArguments("--headless");
+                driver = new RemoteWebDriver(new URL(gridUrl), options);
+            } else {
+                DesiredCapabilities caps = new DesiredCapabilities();
+                caps.setBrowserName(browser);
+                driver = new RemoteWebDriver(new URL(gridUrl), caps);
+            }
         } else {
+            // Локальный запуск (без Grid)
             WebDriverManager.chromedriver().setup();
             ChromeOptions options = new ChromeOptions();
             options.addArguments("--headless=new");
@@ -86,6 +104,7 @@ public class VaccinationCalculatorTest {
         assertTrue(atLeastOneDateFound, "No valid dates found on page");
     }
 
+    // Падающие тесты (оставлены на месте)
     @Test
     @Story("Валидация поля ФИО")
     @Severity(SeverityLevel.NORMAL)
