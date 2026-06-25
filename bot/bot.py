@@ -79,16 +79,26 @@ def wait_for_result(chat_id, message_id, name):
     progress = 10
     step = 5
 
+    # Сначала даём GitHub время на запуск workflow (20 секунд)
+    time.sleep(20)
+
     status_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
+    queued_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=queued"
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
 
     while True:
         elapsed = time.time() - start_time
 
         try:
-            response = requests.get(status_url, headers=headers)
-            runs = response.json()
-            if runs.get('total_count', 0) == 0:
+            # Проверяем выполняющиеся и поставленные в очередь запуски
+            response_in = requests.get(status_url, headers=headers)
+            in_progress = response_in.json().get('total_count', 0)
+
+            response_q = requests.get(queued_url, headers=headers)
+            queued = response_q.json().get('total_count', 0)
+
+            # Если нет ни выполняющихся, ни поставленных в очередь — значит всё завершено
+            if in_progress == 0 and queued == 0:
                 update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
                 time.sleep(10)
                 update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
