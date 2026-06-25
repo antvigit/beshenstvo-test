@@ -65,11 +65,8 @@ def wait_for_result(message, name):
     bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
 if __name__ == '__main__':
-    # Удаляем старый вебхук, чтобы не мешал
     bot.remove_webhook()
     print("🤖 Бот запущен в режиме polling")
-    # Запускаем Flask в отдельном потоке для health check
     import threading
     threading.Thread(target=app.run, kwargs={'host': '0.0.0.0', 'port': int(os.environ.get('PORT', 5000))}, daemon=True).start()
-    # Запускаем polling
     bot.polling()

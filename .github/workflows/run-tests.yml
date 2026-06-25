@@ -58,6 +58,12 @@ jobs:
       - name: Generate Allure report
         run: mvn allure:report
 
+      - name: Start Python HTTP server
+        run: |
+          cd target/site/allure-maven-plugin/
+          python3 -m http.server 8080 &
+          sleep 5
+
       - name: Install Playwright
         run: |
           npm install -g playwright
@@ -65,11 +71,11 @@ jobs:
 
       - name: Take screenshot
         run: |
-          # Используем прямой путь к сгенерированному отчёту
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --timeout=30000 \
-            file://$PWD/target/site/allure-maven-plugin/index.html \
+            --timeout=20000 \
+            --wait-for-timeout=5000 \
+            http://localhost:8080 \
             allure-report.png
 
       - name: Send screenshot with link
@@ -90,4 +96,4 @@ jobs:
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ github.event.inputs.chat_id }} \
-            -d text="✅ Все тесты завершены!💡 Можете повторить запрос командой /run"
+            -d text="✅ Все тесты завершены!%0A💡 Можете повторить запрос командой /run"
