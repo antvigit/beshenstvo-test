@@ -1,8 +1,6 @@
 package tests;
 
-import org.openqa.selenium.chrome.ChromeOptions;
 import io.github.bonigarcia.wdm.WebDriverManager;
-import io.qameta.allure.Allure;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
@@ -10,14 +8,16 @@ import io.qameta.allure.Story;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.remote.DesiredCapabilities;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import pages.VaccinationPage;
 
-import java.io.ByteArrayInputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -32,17 +32,21 @@ public class VaccinationCalculatorTest {
     private VaccinationPage page;
 
     @BeforeEach
-    void setUp() {
-        WebDriverManager.chromedriver().setup();
+    void setUp() throws MalformedURLException {
+        String browser = System.getProperty("browser", "chrome");
+        String gridUrl = System.getProperty("grid.url");
 
-        ChromeOptions options = new ChromeOptions( );
-        options.addArguments("--headless=new");   // Безголовый режим
-        options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--remote-debugging-port=9222");
+        if (gridUrl != null && !gridUrl.isEmpty()) {
+            DesiredCapabilities caps = new DesiredCapabilities();
+            caps.setBrowserName(browser);
+            driver = new RemoteWebDriver(new URL(gridUrl), caps);
+        } else {
+            WebDriverManager.chromedriver().setup();
+            ChromeOptions options = new ChromeOptions();
+            options.addArguments("--headless=new");
+            driver = new ChromeDriver(options);
+        }
 
-        driver = new ChromeDriver(options);
         driver.manage().window().maximize();
         page = new VaccinationPage(driver);
     }
@@ -140,20 +144,6 @@ public class VaccinationCalculatorTest {
 
     @AfterEach
     void tearDown() {
-        if (driver != null) {
-            attachScreenshot();
-            driver.quit();
-        }
-    }
-
-    private void attachScreenshot() {
-        if (driver instanceof TakesScreenshot) {
-            byte[] screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BYTES);
-            try (ByteArrayInputStream bis = new ByteArrayInputStream(screenshot)) {
-                Allure.addAttachment("Screenshot on failure", "image/png", bis, "png");
-            } catch (Exception e) {
-                System.err.println("Failed to attach screenshot: " + e.getMessage());
-            }
-        }
+        if (driver != null) driver.quit();
     }
 }

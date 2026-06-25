@@ -6,6 +6,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        browser: [chrome, firefox]
 
     steps:
       - name: Checkout code
@@ -17,8 +20,14 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Run tests (always continue)
-        run: mvn clean test || true
+      - name: Start Selenium Grid (Docker Compose)
+        run: |
+          docker-compose up -d
+          sleep 10
+
+      - name: Run tests for ${{ matrix.browser }}
+        run: |
+          mvn clean test -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
 
       - name: Wait for Allure results
         run: |
@@ -50,20 +59,21 @@ jobs:
             http://localhost:8080 \
             allure-report.png
 
-      - name: Send screenshot + link + final message to Telegram
+      - name: Send screenshot to Telegram
         run: |
-          # 1. Отправляем скриншот с подписью и ссылкой отдельно
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
             -F chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
             -F photo=@allure-report.png \
-            -F caption="📊 Allure отчёт"
+            -F caption="📊 Allure отчёт для ${{ matrix.browser }}"
 
-          # 2. Отправляем ссылку отдельным сообщением
+      - name: Send link to Telegram
+        run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="🔗 Ссылка на отчёт: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -d text="🔗 Ссылка на отчёт (${{ matrix.browser }}): ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # 3. Отправляем финальное сообщение
+      - name: Send final message
+        run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
             -d chat_id=${{ secrets.TELEGRAM_CHAT_ID }} \
-            -d text="✅ Тесты завершены!%0A💡 Можете повторить запрос командой /run"
+            -d text="✅ Тесты (${{ matrix.browser }}) завершены!%0A💡 Можете повторить запрос командой /run"
