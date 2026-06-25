@@ -23,6 +23,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Send initial message for ${{ matrix.browser }}
+        id: init_msg
+        run: |
+          RESP=$(curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ github.event.inputs.chat_id }} \
+            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...")
+          echo "message_id=$(echo $RESP | jq '.result.message_id')" >> $GITHUB_OUTPUT
+          echo "chat_id=${{ github.event.inputs.chat_id }}" >> $GITHUB_OUTPUT
+          echo "token=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> $GITHUB_OUTPUT
+
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
@@ -45,9 +55,23 @@ jobs:
             sleep 2
           done
 
+      - name: Edit message - tests started
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
+            -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
+            -d message_id=${{ steps.init_msg.outputs.message_id }} \
+            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n⏳ Выполняются тесты..."
+
       - name: Run tests for ${{ matrix.browser }}
         run: |
           mvn clean test -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
+
+      - name: Edit message - tests finished
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
+            -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
+            -d message_id=${{ steps.init_msg.outputs.message_id }} \
+            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n✅ Тесты завершены.\n📊 Генерирую отчёт..."
 
       - name: Wait for Allure results
         run: |
@@ -58,6 +82,13 @@ jobs:
 
       - name: Generate Allure report
         run: mvn allure:report
+
+      - name: Edit message - report generated
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
+            -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
+            -d message_id=${{ steps.init_msg.outputs.message_id }} \
+            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n✅ Тесты завершены.\n📊 Отчёт сгенерирован.\n📸 Делаю скриншот..."
 
       - name: Start Python HTTP server
         run: |
@@ -89,6 +120,13 @@ jobs:
             --wait-for-timeout=10000 \
             http://localhost:8080 \
             allure-report.png
+
+      - name: Edit message - screenshot done
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
+            -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
+            -d message_id=${{ steps.init_msg.outputs.message_id }} \
+            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n✅ Тесты завершены.\n📊 Отчёт сгенерирован.\n📸 Скриншот отправлен."
 
       - name: Send screenshot
         run: |
