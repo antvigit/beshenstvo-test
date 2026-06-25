@@ -44,7 +44,7 @@ def run_tests(message):
     name = message.from_user.first_name
     chat_id = message.chat.id
 
-    progress_msg = bot.reply_to(message, "⏳ Подготовка к запуску... (примерное время ожидания: до 6 минут)")
+    progress_msg = bot.reply_to(message, "⏳ Подготовка к запуску... (примерное время ожидания: до 5 минут)")
     update_progress(chat_id, progress_msg.message_id, 0, "⏳ Подготовка к запуску...")
 
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
@@ -64,20 +64,20 @@ def run_tests(message):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ожидание завершения... (примерное время: до 6 минут)")
+    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ожидание завершения... (примерное время: до 5 минут)")
     wait_for_result(chat_id, progress_msg.message_id, name)
 
 def wait_for_result(chat_id, message_id, name):
-    total_time = 360  # 6 минут
+    total_time = 300  # 5 минут
     start_time = time.time()
     progress = 10
-    step = 3  # увеличиваем шаг для более быстрого прогресса
+    step = 5  # быстрый рост
 
     while True:
         elapsed = time.time() - start_time
         if elapsed >= total_time:
             update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
-            time.sleep(10)  # пауза 10 секунд (вместо 40)
+            time.sleep(10)
             update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
             return
 
@@ -85,7 +85,7 @@ def wait_for_result(chat_id, message_id, name):
         progress += step
         if progress > 95:
             progress = 95
-        update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... (примерное время: до 6 минут)")
+        update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... (примерное время: до 5 минут)")
 
 if __name__ == '__main__':
     try:
