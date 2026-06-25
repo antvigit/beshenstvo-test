@@ -13,7 +13,7 @@ WORKFLOW_ID = 'run-tests.yml'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# Сброс вебхука при старте (защита от 409)
+# Сброс вебхука при старте
 try:
     bot.remove_webhook()
     print("✅ Webhook removed on startup")
@@ -33,6 +33,13 @@ def update_progress(chat_id, message_id, progress, text):
         bot.edit_message_text(new_text, chat_id, message_id)
     except Exception as e:
         print(f"Error updating progress: {e}")
+
+def delete_progress(chat_id, message_id):
+    try:
+        bot.delete_message(chat_id, message_id)
+        print(f"✅ Progress message deleted for {chat_id}")
+    except Exception as e:
+        print(f"⚠️ Could not delete progress message: {e}")
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -71,14 +78,26 @@ def wait_for_result(chat_id, message_id, name):
     total_time = 300  # 5 минут
     start_time = time.time()
     progress = 10
-    step = 5  # быстрый рост
+    step = 5
 
     while True:
         elapsed = time.time() - start_time
         if elapsed >= total_time:
+            # Тесты завершены (по таймеру)
             update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
             time.sleep(10)
             update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
+
+            # Удаляем прогресс-бар
+            delete_progress(chat_id, message_id)
+
+            # Отправляем финальное сообщение
+            bot.send_message(
+                chat_id,
+                f"✅ Все тесты завершены!\n"
+                f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions\n"
+                f"💡 Можете повторить запрос командой /run"
+            )
             return
 
         time.sleep(10)
