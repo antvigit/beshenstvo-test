@@ -84,7 +84,7 @@ junit.jupiter.execution.parallel.mode.default = concurrent
 
 ## Telegram-бот
 
-Бот работает через вебхук (Flask) и позволяет запускать тесты удалённо.
+Бот работает через **вебхук** (Flask + Gunicorn в продакшене) и позволяет запускать тесты удалённо.
 
 Команды:
 
@@ -122,6 +122,16 @@ mvn allure:serve
 1. Напиши боту /run.
 2. Дождись сообщения о завершении.
 3. Открой скриншот или ссылку на отчёт.
+
+##Развёртывание бота на Render
+
+Проект использует Gunicorn для запуска Flask-приложения в продакшене.
+
+    Build Command: pip install -r bot/requirements.txt
+
+    Start Command: gunicorn bot:app
+
+    Health Check Path: /health
 
 ##История изменений
 Полная история изменений проекта описана в файле CHANGELOG.md
