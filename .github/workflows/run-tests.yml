@@ -60,7 +60,7 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
             -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
             -d message_id=${{ steps.init_msg.outputs.message_id }} \
-            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n⏳ Выполняются тесты..."
+            -d "text=🚀 Запускаю тесты для ${{ matrix.browser }}...%0A⏳ Выполняются тесты..."
 
       - name: Run tests for ${{ matrix.browser }}
         run: |
@@ -71,7 +71,7 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
             -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
             -d message_id=${{ steps.init_msg.outputs.message_id }} \
-            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n✅ Тесты завершены.\n📊 Генерирую отчёт..."
+            -d "text=🚀 Запускаю тесты для ${{ matrix.browser }}...%0A✅ Тесты завершены.%0A📊 Генерирую отчёт..."
 
       - name: Wait for Allure results
         run: |
@@ -88,7 +88,7 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
             -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
             -d message_id=${{ steps.init_msg.outputs.message_id }} \
-            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n✅ Тесты завершены.\n📊 Отчёт сгенерирован.\n📸 Делаю скриншот..."
+            -d "text=🚀 Запускаю тесты для ${{ matrix.browser }}...%0A✅ Тесты завершены.%0A📊 Отчёт сгенерирован.%0A📸 Делаю скриншот..."
 
       - name: Start Python HTTP server
         run: |
@@ -126,7 +126,7 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
             -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
             -d message_id=${{ steps.init_msg.outputs.message_id }} \
-            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}...\n✅ Тесты завершены.\n📊 Отчёт сгенерирован.\n📸 Скриншот отправлен."
+            -d "text=🚀 Запускаю тесты для ${{ matrix.browser }}...%0A✅ Тесты завершены.%0A📊 Отчёт сгенерирован.%0A📸 Скриншот отправлен."
 
       - name: Send screenshot
         run: |
