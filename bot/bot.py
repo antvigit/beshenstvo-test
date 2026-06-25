@@ -16,7 +16,12 @@ app = Flask(__name__)
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {"chat_id": chat_id, "text": text}
-    requests.post(url, json=payload)
+    try:
+        resp = requests.post(url, json=payload)
+        print(f"📤 Sent message to {chat_id}: {text[:50]}...")
+        return resp
+    except Exception as e:
+        print(f"❌ Failed to send message: {e}")
 
 # ---- Обработчики команд ----
 def handle_start(chat_id, first_name):
@@ -50,10 +55,15 @@ def wait_for_result(chat_id, first_name):
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
     for _ in range(30):
         time.sleep(10)
-        response = requests.get(url, headers=headers)
-        runs = response.json()
-        if runs.get('total_count', 0) == 0:
-            return
+        try:
+            response = requests.get(url, headers=headers)
+            runs = response.json()
+            if runs.get('total_count', 0) == 0:
+                print(f"✅ Tests finished for {first_name}")
+                return
+        except Exception as e:
+            print(f"⚠️ Error waiting for results: {e}")
+            break
     send_message(chat_id, f"⏰ {first_name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
 # ---- Установка вебхука ----
@@ -72,23 +82,42 @@ def health():
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
+    raw_data = request.get_data(as_text=True)
+    print(f"📩 Raw webhook data (first 200 chars): {raw_data[:200]}")
+
     if request.headers.get('content-type') == 'application/json':
-        data = request.get_json()
-        print("📩 Webhook received:", json.dumps(data, indent=2))
-        if 'message' in data:
-            message = data['message']
-            chat_id = message['chat']['id']
-            first_name = message['from'].get('first_name', 'User')
-            if 'text' in message:
-                text = message['text']
-                if text == '/start':
-                    handle_start(chat_id, first_name)
-                elif text == '/run':
-                    handle_run(chat_id, first_name)
+        try:
+            data = request.get_json()
+            print(f"📩 Parsed webhook: {json.dumps(data, indent=2)[:500]}")
+
+            if 'message' in data:
+                message = data['message']
+                chat_id = message['chat']['id']
+                first_name = message['from'].get('first_name', 'User')
+
+                if 'text' in message:
+                    text = message['text']
+                    print(f"📩 Command from {first_name}: {text}")
+
+                    if text == '/start':
+                        handle_start(chat_id, first_name)
+                    elif text == '/run':
+                        handle_run(chat_id, first_name)
+                    else:
+                        send_message(chat_id, "Неизвестная команда. Доступны: /start, /run")
                 else:
-                    send_message(chat_id, "Неизвестная команда. Доступны: /start, /run")
-        return 'OK', 200
-    return 'Bad Request', 400
+                    print("ℹ️ Message without text (ignored)")
+            else:
+                print("ℹ️ Update without message (ignored)")
+
+        except Exception as e:
+            print(f"❌ Error processing webhook: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print(f"❌ Invalid content-type: {request.headers.get('content-type')}")
+
+    return 'OK', 200
 
 if __name__ == '__main__':
     # Gunicorn запускает app
