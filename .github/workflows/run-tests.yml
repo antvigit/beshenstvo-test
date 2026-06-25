@@ -22,7 +22,7 @@ jobs:
 
       - name: Start Selenium Grid (Docker Compose)
         run: |
-          docker-compose up -d
+          docker compose up -d
           sleep 10
 
       - name: Run tests for ${{ matrix.browser }}
