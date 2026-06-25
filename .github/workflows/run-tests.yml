@@ -20,15 +20,25 @@ jobs:
         browser: [chrome, firefox]
 
     steps:
+      # 1. Код получен
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2. Уведомление о начале работы для конкретного браузера
+      - name: Notify - Starting tests for ${{ matrix.browser }}
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ github.event.inputs.chat_id }} \
+            -d text="🚀 Запускаю тесты для ${{ matrix.browser }}..."
+
+      # 3. Настройка Java
       - name: Set up JDK 11
         uses: actions/setup-java@v4
         with:
           java-version: '11'
           distribution: 'temurin'
 
+      # 4. Поднятие Selenium Grid
       - name: Start Selenium Grid
         run: |
           docker compose up -d
@@ -45,10 +55,20 @@ jobs:
             sleep 2
           done
 
+      # 5. Запуск тестов
       - name: Run tests for ${{ matrix.browser }}
         run: |
           mvn clean test -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
 
+      # 6. Уведомление о завершении тестов для браузера
+      - name: Notify - Tests finished for ${{ matrix.browser }}
+        if: always()  # отправляем даже если упали
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ github.event.inputs.chat_id }} \
+            -d text="✅ Тесты для ${{ matrix.browser }} завершены."
+
+      # 7. Ожидание результатов Allure
       - name: Wait for Allure results
         run: |
           while [ ! -d target/allure-results ] || [ -z "$(ls -A target/allure-results 2>/dev/null)" ]; do
@@ -56,9 +76,18 @@ jobs:
             sleep 5
           done
 
+      # 8. Генерация Allure-отчёта
       - name: Generate Allure report
         run: mvn allure:report
 
+      # 9. Уведомление о генерации отчёта
+      - name: Notify - Allure report generated for ${{ matrix.browser }}
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ github.event.inputs.chat_id }} \
+            -d text="📊 Отчёт для ${{ matrix.browser }} сгенерирован, делаю скриншот..."
+
+      # 10. Запуск HTTP-сервера для Allure
       - name: Start Python HTTP server
         run: |
           cd target/site/allure-maven-plugin/
@@ -76,11 +105,13 @@ jobs:
             sleep 2
           done
 
+      # 11. Установка Playwright
       - name: Install Playwright
         run: |
           npm install -g playwright
           npx playwright install --with-deps chromium
 
+      # 12. Создание скриншота
       - name: Take screenshot
         run: |
           npx playwright screenshot \
@@ -90,6 +121,7 @@ jobs:
             http://localhost:8080 \
             allure-report.png
 
+      # 13. Отправка скриншота
       - name: Send screenshot
         run: |
           if [ -f allure-report.png ]; then
@@ -106,6 +138,7 @@ jobs:
     needs: test
     if: always()
     steps:
+      # Финальное сообщение со ссылкой на отчёт
       - name: Send final completion message
         run: |
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
