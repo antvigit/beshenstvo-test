@@ -25,6 +25,7 @@ def set_webhook():
 
 set_webhook()
 
+# ---- Эндпоинты ----
 @app.route('/health', methods=['GET'])
 def health():
     return 'OK', 200
@@ -37,11 +38,15 @@ def webhook():
         update = telebot.types.Update.de_json(json_string)
         if update.message:
             print(f"📩 Message from {update.message.from_user.first_name}: {update.message.text}")
-        # Универсальный метод обработки
-        bot.process_new_updates([update])
+            # Прямая обработка сообщения
+            bot.process_new_messages([update.message])
+        else:
+            # Обработка других типов обновлений
+            bot.process_new_updates([update])
         return 'OK', 200
     return 'Bad Request', 400
 
+# ---- Обработчики команд ----
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     print("🔥 /start handler called")
@@ -92,5 +97,5 @@ def wait_for_result(message, name):
     bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
 if __name__ == '__main__':
-    # Не используем app.run() — Gunicorn запускает app
+    # Gunicorn запускает app, поэтому app.run() не нужен
     pass
