@@ -80,7 +80,7 @@ jobs:
 
       - name: Send screenshot with link
         run: |
-          CAPTION=$(printf "📊 Allure отчёт для ${{ matrix.browser }}\n🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
+          CAPTION=$(printf "Allure отчёт для %s\n🔗 Ссылка: %s" "${{ matrix.browser }}" "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}")
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
             -F chat_id=${{ github.event.inputs.chat_id }} \
             -F photo=@allure-report.png \
