@@ -121,20 +121,18 @@ jobs:
             http://localhost:8080 \
             allure-report.png
 
-      - name: Edit message - screenshot done
-        run: |
-          curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/editMessageText \
-            -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
-            -d message_id=${{ steps.init_msg.outputs.message_id }} \
-            -d "text=🚀 Запускаю тесты для ${{ matrix.browser }}...%0A✅ Тесты завершены.%0A📊 Отчёт сгенерирован.%0A📸 Скриншот отправлен."
-
-      - name: Send screenshot
+      - name: Send screenshot and delete status message
         run: |
           if [ -f allure-report.png ]; then
+            # Отправляем скриншот
             curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
               -F chat_id=${{ github.event.inputs.chat_id }} \
               -F photo=@allure-report.png \
               -F caption="📊 Allure отчёт для ${{ matrix.browser }}"
+            # Удаляем статусное сообщение
+            curl -s -X POST https://api.telegram.org/bot${{ steps.init_msg.outputs.token }}/deleteMessage \
+              -d chat_id=${{ steps.init_msg.outputs.chat_id }} \
+              -d message_id=${{ steps.init_msg.outputs.message_id }}
           else
             echo "Screenshot not found, skip sending"
           fi
