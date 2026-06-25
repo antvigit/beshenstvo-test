@@ -18,7 +18,6 @@ def health():
     return 'OK', 200
 
 def update_progress(chat_id, message_id, progress, text):
-    """Обновляет сообщение с прогресс-баром."""
     bar_length = 10
     filled = int(progress / 100 * bar_length)
     bar = '█' * filled + '░' * (bar_length - filled)
@@ -38,11 +37,9 @@ def run_tests(message):
     name = message.from_user.first_name
     chat_id = message.chat.id
 
-    # Отправляем начальное сообщение с прогресс-баром
     progress_msg = bot.reply_to(message, "🔄 Запускаю тесты...")
     update_progress(chat_id, progress_msg.message_id, 0, "🔄 Подготовка к запуску...")
 
-    # Запускаем GitHub Actions
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -60,10 +57,7 @@ def run_tests(message):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    # Обновляем прогресс после успешного запуска
-    update_progress(chat_id, progress_msg.message_id, 10, "⏳ Тесты запущены, ожидание завершения...")
-
-    # Ждём завершения
+    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ждём завершения...")
     wait_for_result(chat_id, progress_msg.message_id, name)
 
 def wait_for_result(chat_id, message_id, name):
@@ -71,25 +65,31 @@ def wait_for_result(chat_id, message_id, name):
     headers = {"Authorization": f"token {GITHUB_TOKEN}"}
 
     progress = 10
-    for _ in range(30):
+    step = 3
+
+    for i in range(20):
         time.sleep(10)
         try:
             response = requests.get(url, headers=headers)
             runs = response.json()
             if runs.get('total_count', 0) == 0:
-                # Тесты завершены
-                update_progress(chat_id, message_id, 100, "✅ Тесты завершены!")
+                # Тесты завершены → обновляем до 95%
+                update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
+                # Ждём 25 секунд, чтобы скриншоты успели отправиться
+                time.sleep(25)
+                # Обновляем до 100%
+                update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
                 return
         except Exception as e:
             print(f"Error checking status: {e}")
 
-        # Имитация прогресса (не более 95%)
-        progress += 5
-        if progress > 95:
-            progress = 95
-        update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... {progress}%")
+        if progress < 85:
+            progress += step
+            if progress > 85:
+                progress = 85
+            update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов...")
 
-    # Если цикл закончился (таймаут)
+    # Таймаут
     update_progress(chat_id, message_id, 100, "⏰ Тесты всё ещё выполняются. Проверь вручную.")
     bot.send_message(chat_id, f"⏰ {name}, проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
