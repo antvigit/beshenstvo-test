@@ -37,8 +37,8 @@ def run_tests(message):
     name = message.from_user.first_name
     chat_id = message.chat.id
 
-    progress_msg = bot.reply_to(message, "🔄 Запускаю тесты...")
-    update_progress(chat_id, progress_msg.message_id, 0, "🔄 Подготовка к запуску...")
+    progress_msg = bot.reply_to(message, "⏳ Подготовка к запуску... (примерное время ожидания: до 5 минут)")
+    update_progress(chat_id, progress_msg.message_id, 0, "⏳ Подготовка к запуску...")
 
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
     headers = {
@@ -57,7 +57,7 @@ def run_tests(message):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ждём завершения...")
+    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ожидание завершения... (примерное время: до 5 минут)")
     wait_for_result(chat_id, progress_msg.message_id, name)
 
 def wait_for_result(chat_id, message_id, name):
@@ -67,17 +67,16 @@ def wait_for_result(chat_id, message_id, name):
     progress = 10
     step = 3
 
-    for i in range(20):
+    for i in range(30):  # 30 * 10 = 300 секунд (5 минут)
         time.sleep(10)
         try:
             response = requests.get(url, headers=headers)
             runs = response.json()
             if runs.get('total_count', 0) == 0:
-                # Тесты завершены → обновляем до 95%
-                update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
-                # Ждём 25 секунд, чтобы скриншоты успели отправиться
-                time.sleep(25)
-                # Обновляем до 100%
+                # Тесты завершены
+                update_progress(chat_id, message_id, 90, "📊 Тесты завершены, ожидаю скриншоты...")
+                # Ждём 40 секунд, чтобы скриншоты успели отправиться
+                time.sleep(40)
                 update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
                 return
         except Exception as e:
@@ -87,7 +86,7 @@ def wait_for_result(chat_id, message_id, name):
             progress += step
             if progress > 85:
                 progress = 85
-            update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов...")
+            update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... (примерное время: до 5 минут)")
 
     # Таймаут
     update_progress(chat_id, message_id, 100, "⏰ Тесты всё ещё выполняются. Проверь вручную.")
