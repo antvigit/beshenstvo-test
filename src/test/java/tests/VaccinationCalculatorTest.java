@@ -5,6 +5,8 @@ import io.qameta.allure.Feature;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
 import io.qameta.allure.Story;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,7 @@ public class VaccinationCalculatorTest {
 
     private WebDriver driver;
     private VaccinationPage page;
+    private static final Logger log = LogManager.getLogger(VaccinationCalculatorTest.class);
 
     @BeforeEach
     void setUp() throws MalformedURLException {
@@ -94,10 +97,10 @@ public class VaccinationCalculatorTest {
                 LocalDate parsedDate = LocalDate.parse(datePart, formatter);
                 assertTrue(parsedDate.getYear() >= 2025 && parsedDate.getYear() <= 2030,
                         "Date out of range: " + datePart);
-                System.out.println("✅ Valid date: " + datePart);
+                log.info("✅ Valid date: " + datePart);
                 atLeastOneDateFound = true;
             } catch (DateTimeParseException e) {
-                System.out.println("⏭️ Skipped (not a date): " + datePart);
+                log.warn("⏭️ Skipped (not a date): " + datePart);
             }
         }
 

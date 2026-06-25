@@ -16,6 +16,10 @@ app = Flask(__name__)
 def is_authorized(message):
     return True  # доступ разрешён всем
 
+@app.route('/health', methods=['GET'])
+def health():
+    return 'OK', 200
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     name = message.from_user.first_name
@@ -82,3 +86,4 @@ if __name__ == '__main__':
         print(f'❌ Failed to set webhook: {e}')
 
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
+
