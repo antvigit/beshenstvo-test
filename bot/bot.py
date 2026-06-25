@@ -2,6 +2,7 @@ import telebot
 import requests
 import os
 import time
+from flask import Flask, request
 
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
@@ -10,32 +11,19 @@ REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
 WORKFLOW_ID = 'run-tests.yml'
 
-# ===== СБРОС ВЕБХУКА ПРИ ЗАПУСКЕ (УБИВАЕТ СТАРЫЕ СЕССИИ) =====
-try:
-    resp = requests.post(f'https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook')
-    print(f'✅ Webhook deleted: {resp.status_code} {resp.text}')
-except Exception as e:
-    print(f'❌ Failed to delete webhook: {e}')
-
 bot = telebot.TeleBot(BOT_TOKEN)
+app = Flask(__name__)
 
 def is_authorized(message):
-    return str(message.chat.id) == CHAT_ID
+    return True  # доступ разрешён всем
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    if not is_authorized(message):
-        bot.reply_to(message, "❌ У вас нет доступа к этому боту.")
-        return
     name = message.from_user.first_name
     bot.reply_to(message, f"Привет, {name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы запустить тесты.")
 
 @bot.message_handler(commands=['run'])
 def run_tests(message):
-    if not is_authorized(message):
-        bot.reply_to(message, "❌ У вас нет доступа к этому боту.")
-        return
-
     name = message.from_user.first_name
     bot.reply_to(message, f"🔄 {name}, запускаю тесты...")
 
@@ -65,17 +53,26 @@ def wait_for_result(message, name):
         runs = response.json()
 
         if runs.get('total_count', 0) == 0:
-            bot.send_message(message.chat.id, f"📸 {name}, скриншот отчёта уже в пути...")
             return
 
     bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
 
-if __name__ == "__main__":
-    # Ещё один сброс перед запуском polling (на всякий случай)
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Bad Request', 400
+
+if __name__ == '__main__':
+    webhook_url = os.environ.get('RENDER_EXTERNAL_URL', 'https://beshenstvo-test-bot.onrender.com') + '/webhook'
     try:
         bot.remove_webhook()
-        print("✅ Webhook removed before polling")
+        bot.set_webhook(url=webhook_url)
+        print(f'✅ Webhook set to {webhook_url}')
     except Exception as e:
-        print(f"❌ Failed to remove webhook: {e}")
+        print(f'❌ Failed to set webhook: {e}')
 
-    bot.polling()
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
