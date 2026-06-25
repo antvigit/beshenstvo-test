@@ -1,7 +1,7 @@
+import telebot
 import requests
 import os
 import time
-import json
 from flask import Flask, request
 
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -10,115 +10,68 @@ REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
 WORKFLOW_ID = 'run-tests.yml'
 
+bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# ---- Отправка сообщений в Telegram ----
-def send_message(chat_id, text):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text}
-    try:
-        resp = requests.post(url, json=payload)
-        print(f"📤 Sent message to {chat_id}: {text[:50]}...")
-        return resp
-    except Exception as e:
-        print(f"❌ Failed to send message: {e}")
-
-# ---- Обработчики команд ----
-def handle_start(chat_id, first_name):
-    send_message(chat_id, f"Привет, {first_name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы запустить тесты.")
-
-def handle_run(chat_id, first_name):
-    send_message(chat_id, f"🔄 {first_name}, запускаю тесты...")
-
-    gh_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
-    headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    gh_payload = {
-        "ref": "master",
-        "inputs": {
-            "chat_id": str(chat_id)
-        }
-    }
-    response = requests.post(gh_url, json=gh_payload, headers=headers)
-
-    if response.status_code != 204:
-        send_message(chat_id, f"❌ Ошибка при запуске: {response.status_code}")
-        return
-
-    send_message(chat_id, f"⏳ {first_name}, тесты запущены. Жду завершения...\nЭто может занять 2–3 минуты.")
-    wait_for_result(chat_id, first_name)
-
-def wait_for_result(chat_id, first_name):
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-    for _ in range(30):
-        time.sleep(10)
-        try:
-            response = requests.get(url, headers=headers)
-            runs = response.json()
-            if runs.get('total_count', 0) == 0:
-                print(f"✅ Tests finished for {first_name}")
-                return
-        except Exception as e:
-            print(f"⚠️ Error waiting for results: {e}")
-            break
-    send_message(chat_id, f"⏰ {first_name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
-
-# ---- Установка вебхука ----
-def set_webhook():
-    webhook_url = os.environ.get('RENDER_EXTERNAL_URL', 'https://beshenstvo-test-bot.onrender.com') + '/webhook'
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={webhook_url}&drop_pending_updates=true"
-    response = requests.get(url)
-    print(f"✅ Webhook set: {response.json()}")
-
-set_webhook()
-
-# ---- Эндпоинты Flask ----
 @app.route('/health', methods=['GET'])
 def health():
     return 'OK', 200
 
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    name = message.from_user.first_name
+    bot.reply_to(message, f"Привет, {name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы запустить тесты.")
+
+@bot.message_handler(commands=['run'])
+def run_tests(message):
+    name = message.from_user.first_name
+    bot.reply_to(message, f"🔄 {name}, запускаю тесты...")
+
+    chat_id = str(message.chat.id)
+
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    payload = {
+        "ref": "master",
+        "inputs": {
+            "chat_id": chat_id
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+
+    if response.status_code != 204:
+        bot.send_message(message.chat.id, f"❌ Ошибка при запуске: {response.status_code}")
+        return
+
+    bot.send_message(message.chat.id, f"⏳ {name}, тесты запущены. Жду завершения...\nЭто может занять 2–3 минуты.")
+
+    wait_for_result(message, name)
+
+def wait_for_result(message, name):
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+
+    for _ in range(30):
+        time.sleep(10)
+        response = requests.get(url, headers=headers)
+        runs = response.json()
+
+        if runs.get('total_count', 0) == 0:
+            return
+
+    bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    raw_data = request.get_data(as_text=True)
-    print(f"📩 Raw webhook data (first 200 chars): {raw_data[:200]}")
-
     if request.headers.get('content-type') == 'application/json':
-        try:
-            data = request.get_json()
-            print(f"📩 Parsed webhook: {json.dumps(data, indent=2)[:500]}")
-
-            if 'message' in data:
-                message = data['message']
-                chat_id = message['chat']['id']
-                first_name = message['from'].get('first_name', 'User')
-
-                if 'text' in message:
-                    text = message['text']
-                    print(f"📩 Command from {first_name}: {text}")
-
-                    if text == '/start':
-                        handle_start(chat_id, first_name)
-                    elif text == '/run':
-                        handle_run(chat_id, first_name)
-                    else:
-                        send_message(chat_id, "Неизвестная команда. Доступны: /start, /run")
-                else:
-                    print("ℹ️ Message without text (ignored)")
-            else:
-                print("ℹ️ Update without message (ignored)")
-
-        except Exception as e:
-            print(f"❌ Error processing webhook: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print(f"❌ Invalid content-type: {request.headers.get('content-type')}")
-
-    return 'OK', 200
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Bad Request', 400
 
 if __name__ == '__main__':
-    # Gunicorn запускает app
-    pass
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
