@@ -84,7 +84,7 @@ jobs:
             -F chat_id=${{ github.event.inputs.chat_id }} \
             -F photo=@allure-report.png \
             --data-urlencode "caption=📊 Allure отчёт для ${{ matrix.browser }}
-      🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   finalize:
     runs-on: ubuntu-latest
