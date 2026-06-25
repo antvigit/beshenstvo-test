@@ -95,7 +95,7 @@ def wait_for_result(chat_id, message_id, name):
                 delete_progress(chat_id, message_id)
                 bot.send_message(
                     chat_id,
-                    f"✅ Все тесты завершены!\n"
+                    f"✅ Все тесты завершены, {name}!\n"
                     f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions\n"
                     f"💡 Можете повторить запрос командой /run"
                 )
