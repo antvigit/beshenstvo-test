@@ -13,7 +13,6 @@ WORKFLOW_ID = 'run-tests.yml'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# Сброс вебхука при старте
 try:
     bot.remove_webhook()
     print("✅ Webhook removed on startup")
@@ -80,23 +79,39 @@ def wait_for_result(chat_id, message_id, name):
     progress = 10
     step = 5
 
+    status_url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
+    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+
     while True:
         elapsed = time.time() - start_time
+
+        try:
+            response = requests.get(status_url, headers=headers)
+            runs = response.json()
+            if runs.get('total_count', 0) == 0:
+                update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
+                time.sleep(10)
+                update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
+                delete_progress(chat_id, message_id)
+                bot.send_message(
+                    chat_id,
+                    f"✅ Все тесты завершены!\n"
+                    f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions\n"
+                    f"💡 Можете повторить запрос командой /run"
+                )
+                return
+        except Exception as e:
+            print(f"Error checking status: {e}")
+
         if elapsed >= total_time:
-            # Тесты завершены (по таймеру)
-            update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
-            time.sleep(10)
-            update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
-
-            # Удаляем прогресс-бар
+            update_progress(chat_id, message_id, 95, "⏰ Время ожидания истекло, проверьте результат вручную...")
+            time.sleep(5)
+            update_progress(chat_id, message_id, 100, "⏰ Проверьте результат вручную")
             delete_progress(chat_id, message_id)
-
-            # Отправляем финальное сообщение
             bot.send_message(
                 chat_id,
-                f"✅ Все тесты завершены!\n"
-                f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions\n"
-                f"💡 Можете повторить запрос командой /run"
+                f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\n"
+                f"📊 https://github.com/{REPO_OWNER}/{REPO_NAME}/actions"
             )
             return
 
