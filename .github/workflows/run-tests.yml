@@ -58,42 +58,28 @@ jobs:
       - name: Generate Allure report
         run: mvn allure:report
 
-      - name: Start Python HTTP server
+      - name: Install Playwright
         run: |
-          cd target/site/allure-maven-plugin/
-          python3 -m http.server 8080 &
-          sleep 5
-
-      - name: Check Allure report availability
-        run: |
-          echo "Checking Allure report..."
-          curl -s http://localhost:8080/ || echo "Allure report not accessible!"
+          npm install -g playwright
+          npx playwright install --with-deps chromium
 
       - name: Take screenshot
         run: |
-          echo "Taking screenshot..."
+          # Используем прямой путь к сгенерированному отчёту
           npx playwright screenshot \
             --viewport-size=1280,720 \
             --timeout=30000 \
-            --wait-for-timeout=10000 \
-            http://localhost:8080 \
+            file://$PWD/target/site/allure-maven-plugin/index.html \
             allure-report.png
-          echo "Screenshot taken, checking file..."
-          ls -la allure-report.png || echo "Screenshot file not found!"
 
       - name: Send screenshot with link
         run: |
-          if [ -f allure-report.png ]; then
-            echo "Screenshot found, sending..."
-            CAPTION="📊 Allure отчёт для ${{ matrix.browser }}
-            🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
-              -F chat_id=${{ github.event.inputs.chat_id }} \
-              -F photo=@allure-report.png \
-              --data-urlencode "caption=$CAPTION"
-          else
-            echo "Screenshot not found, skipping..."
-          fi
+          CAPTION="📊 Allure отчёт для ${{ matrix.browser }}
+          🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
+            -F chat_id=${{ github.event.inputs.chat_id }} \
+            -F photo=@allure-report.png \
+            --data-urlencode "caption=$CAPTION"
 
   finalize:
     runs-on: ubuntu-latest
