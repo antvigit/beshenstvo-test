@@ -1,8 +1,8 @@
+import sys
 import telebot
 import requests
 import os
 import time
-import sys
 from flask import Flask, request
 
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -95,14 +95,13 @@ def wait_for_result(message, name):
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    try:
-        if request.headers.get('content-type') == 'application/json':
-            json_string = request.get_data().decode('utf-8')
-            print("Incoming webhook data:", json_string[:200])  # логируем часть для отладки
-            update = telebot.types.Update.de_json(json_string)
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        print("Incoming webhook data:", json_string[:200])  # для отладки
+        update = telebot.types.Update.de_json(json_string)
+        if update.message:
+            bot.process_new_messages([update.message])
+        else:
             bot.process_new_updates([update])
-            return 'OK', 200
-        return 'Bad Request', 400
-    except Exception as e:
-        print(f"Webhook error: {e}")
-        return 'Error', 500
+        return 'OK', 200
+    return 'Bad Request', 400
