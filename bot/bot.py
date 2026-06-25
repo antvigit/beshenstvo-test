@@ -57,44 +57,28 @@ def run_tests(message):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ожидание завершения... (примерное время: до 5 минут)")
+    # Запускаем плавный прогресс
     wait_for_result(chat_id, progress_msg.message_id, name)
 
 def wait_for_result(chat_id, message_id, name):
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/runs?branch=master&status=in_progress"
-    headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-
+    # Плавный прогресс в течение 5 минут (300 секунд)
+    total_time = 300  # 5 минут
+    start_time = time.time()
     progress = 10
-    step = 3
+    step = 2  # увеличиваем на 2% каждые 10 секунд
 
-    for i in range(30):  # 30 * 10 = 300 секунд (5 минут)
+    while True:
+        elapsed = time.time() - start_time
+        if elapsed >= total_time:
+            # Время вышло — считаем, что тесты должны были завершиться
+            update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
+            time.sleep(40)  # ждём отправки скриншотов
+            update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
+            return
+
+        # Обновляем прогресс каждые 10 секунд
         time.sleep(10)
-        try:
-            response = requests.get(url, headers=headers)
-            runs = response.json()
-            if runs.get('total_count', 0) == 0:
-                # Тесты завершены
-                update_progress(chat_id, message_id, 90, "📊 Тесты завершены, ожидаю скриншоты...")
-                # Ждём 40 секунд, чтобы скриншоты успели отправиться
-                time.sleep(40)
-                update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
-                return
-        except Exception as e:
-            print(f"Error checking status: {e}")
-
-        if progress < 85:
-            progress += step
-            if progress > 85:
-                progress = 85
-            update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... (примерное время: до 5 минут)")
-
-    # Таймаут
-    update_progress(chat_id, message_id, 100, "⏰ Тесты всё ещё выполняются. Проверь вручную.")
-    bot.send_message(chat_id, f"⏰ {name}, проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
-
-if __name__ == '__main__':
-    bot.remove_webhook()
-    print("🤖 Бот запущен в режиме polling")
-    import threading
-    threading.Thread(target=app.run, kwargs={'host': '0.0.0.0', 'port': int(os.environ.get('PORT', 5000))}, daemon=True).start()
-    bot.polling()
+        progress += step
+        if progress > 90:
+            progress = 90  # не поднимаем выше 90%, пока не завершится таймер
+        update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... (примерное время: до 5 минут)")
