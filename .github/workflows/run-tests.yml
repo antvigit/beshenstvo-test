@@ -58,6 +58,23 @@ jobs:
       - name: Generate Allure report
         run: mvn allure:report
 
+      - name: Start Python HTTP server
+        run: |
+          cd target/site/allure-maven-plugin/
+          python3 -m http.server 8080 &
+          sleep 5
+
+      - name: Wait for server to be ready
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:8080 > /dev/null; then
+              echo "Server is ready"
+              break
+            fi
+            echo "Waiting for server..."
+            sleep 2
+          done
+
       - name: Install Playwright
         run: |
           npm install -g playwright
@@ -65,20 +82,12 @@ jobs:
 
       - name: Take screenshot
         run: |
-          # Проверяем, что index.html существует
-          REPORT_PATH="$PWD/target/site/allure-maven-plugin/index.html"
-          if [ ! -f "$REPORT_PATH" ]; then
-            echo "❌ index.html not found!"
-            exit 1
-          fi
-          echo "✅ index.html found"
-          # Делаем скриншот с большим таймаутом
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --timeout=60000 \
+            --timeout=30000 \
             --wait-for-timeout=10000 \
-            "file://$REPORT_PATH" \
-            allure-report.png || echo "Screenshot failed"
+            http://localhost:8080 \
+            allure-report.png
 
       - name: Check screenshot file
         run: |
