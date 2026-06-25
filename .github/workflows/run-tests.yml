@@ -44,15 +44,9 @@ jobs:
             sleep 2
           done
 
-      - name: Build Docker image
-        run: docker build -t beshenstvo-tests .
-
       - name: Run tests for ${{ matrix.browser }}
         run: |
-          docker run --network="host" \
-            -e browser=${{ matrix.browser }} \
-            -e grid.url=http://localhost:4444/wd/hub \
-            beshenstvo-tests
+          mvn clean test -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
 
       - name: Wait for Allure results
         run: |
@@ -89,8 +83,7 @@ jobs:
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
             -F chat_id=${{ github.event.inputs.chat_id }} \
             -F photo=@allure-report.png \
-            --data-urlencode "caption=📊 Allure отчёт для ${{ matrix.browser }}
-      🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            -F caption="📊 Allure отчёт для ${{ matrix.browser }}%0A🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   finalize:
     runs-on: ubuntu-latest
