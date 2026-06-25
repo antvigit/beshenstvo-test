@@ -76,29 +76,15 @@ jobs:
             --timeout=20000 \
             --wait-for-timeout=5000 \
             http://localhost:8080 \
-            allure-report.png || echo "Screenshot failed"
-
-      - name: Check screenshot file
-        run: |
-          if [ -f allure-report.png ]; then
-            echo "✅ Screenshot exists"
-            ls -la allure-report.png
-          else
-            echo "❌ Screenshot file not found!"
-            exit 1
-          fi
+            allure-report.png
 
       - name: Send screenshot with link
         run: |
-          if [ ! -f allure-report.png ]; then
-            echo "❌ No screenshot to send"
-            exit 1
-          fi
           CAPTION="📊 Allure отчёт для ${{ matrix.browser }}
           🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
             -F chat_id=${{ github.event.inputs.chat_id }} \
-            -F photo=@${{ github.workspace }}/allure-report.png \
+            -F photo=@allure-report.png \
             --data-urlencode "caption=$CAPTION"
 
   finalize:
