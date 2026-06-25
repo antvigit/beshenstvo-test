@@ -90,15 +90,6 @@ jobs:
             http://localhost:8080 \
             allure-report.png
 
-      - name: Check screenshot file
-        run: |
-          if [ -f allure-report.png ]; then
-            echo "✅ Screenshot exists"
-            ls -la allure-report.png
-          else
-            echo "❌ Screenshot not found"
-          fi
-
       - name: Send screenshot
         run: |
           if [ -f allure-report.png ]; then
@@ -109,12 +100,6 @@ jobs:
           else
             echo "Screenshot not found, skip sending"
           fi
-
-      - name: Send link
-        run: |
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
-            -d chat_id=${{ github.event.inputs.chat_id }} \
-            -d text="🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   finalize:
     runs-on: ubuntu-latest
