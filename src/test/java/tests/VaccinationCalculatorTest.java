@@ -37,8 +37,8 @@ public class VaccinationCalculatorTest {
 
     @BeforeEach
     void setUp() throws MalformedURLException {
-        String browser = System.getProperty("browser", "chrome");
-        String gridUrl = System.getProperty("grid.url");
+        String browser = System.getenv("browser") != null ? System.getenv("browser") : "chrome";
+        String gridUrl = System.getenv("grid.url");
 
         if (gridUrl != null && !gridUrl.isEmpty()) {
             // Запуск через Selenium Grid

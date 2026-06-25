@@ -8,12 +8,14 @@
 
 - **Языки:** Java 11, Python 3.9+
 - **Сборка:** Maven
-- **Тесты:** Selenium 4, JUnit 5
+- **Тесты:** Selenium 4, JUnit 5 (параллельный запуск)
 - **Отчёты:** Allure
 - **Архитектура:** Page Object Model + Page Factory, SOLID
+- **Логирование:** Log4j
+- **Контейнеризация:** Docker (Dockerfile для тестов)
 - **Бот:** TeleBot, Flask, Requests (вебхук)
-- **Контейнеризация:** Docker, Selenium Grid (Chrome + Firefox)
-- **CI/CD:** GitHub Actions (матрица браузеров)
+- **Контейнеризация окружения:** Docker Compose + Selenium Grid (Chrome + Firefox)
+- **CI/CD:** GitHub Actions (матрица браузеров, контейнерный запуск)
 - **Хостинг:** Render
 
 ---
@@ -49,9 +51,20 @@
 ```bash
 docker compose up -d
 ```
-Тесты подключаются к Grid через переменные browser и grid.url
-
+Тесты подключаются к Grid через переменные browser и grid.url.
+Сами тесты также контейнеризированы — для их запуска используется Dockerfile:
+docker build -t beshenstvo-tests .
+docker run --network="host" -e browser=chrome -e grid.url=http://localhost:4444/wd/hub beshenstvo-tests
 ---
+##Параллельный запуск
+JUnit 5 настроен на параллельное выполнение тестов внутри одного браузера. Конфигурация лежит в src/test/resources/junit-platform.properties.
+
+##Логирование
+
+Вместо System.out.println используется Log4j. Настройки в src/main/resources/log4j2.xml.
+
+junit.jupiter.execution.parallel.enabled = true
+junit.jupiter.execution.parallel.mode.default = concurrent
 ## Тесты
 
 Основной тест — `shouldValidateVaccinationDates`:
