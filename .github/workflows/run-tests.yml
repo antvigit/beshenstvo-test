@@ -71,12 +71,15 @@ jobs:
 
       - name: Take screenshot
         run: |
+          # Проверяем, что сервер запущен
+          curl -s http://localhost:8080/ || echo "Server not ready"
+          # Делаем скриншот с большим таймаутом
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --timeout=20000 \
-            --wait-for-timeout=5000 \
+            --timeout=30000 \
+            --wait-for-timeout=10000 \
             http://localhost:8080 \
-            allure-report.png
+            allure-report.png || echo "Screenshot failed"
 
       - name: Send screenshot with link
         run: |
