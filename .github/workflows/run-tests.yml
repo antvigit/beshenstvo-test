@@ -58,12 +58,6 @@ jobs:
       - name: Generate Allure report
         run: mvn allure:report
 
-      - name: Start Python HTTP server
-        run: |
-          cd target/site/allure-maven-plugin/
-          python3 -m http.server 8080 &
-          sleep 5
-
       - name: Install Playwright
         run: |
           npm install -g playwright
@@ -71,21 +65,43 @@ jobs:
 
       - name: Take screenshot
         run: |
+          # Проверяем, что index.html существует
+          REPORT_PATH="$PWD/target/site/allure-maven-plugin/index.html"
+          if [ ! -f "$REPORT_PATH" ]; then
+            echo "❌ index.html not found!"
+            exit 1
+          fi
+          echo "✅ index.html found"
+          # Делаем скриншот с большим таймаутом
           npx playwright screenshot \
             --viewport-size=1280,720 \
-            --timeout=20000 \
-            --wait-for-timeout=5000 \
-            http://localhost:8080 \
-            allure-report.png
+            --timeout=60000 \
+            --wait-for-timeout=10000 \
+            "file://$REPORT_PATH" \
+            allure-report.png || echo "Screenshot failed"
 
-      - name: Send screenshot with link
+      - name: Check screenshot file
         run: |
-          CAPTION="📊 Allure отчёт для ${{ matrix.browser }}
-          🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
-            -F chat_id=${{ github.event.inputs.chat_id }} \
-            -F photo=@allure-report.png \
-            --data-urlencode "caption=$CAPTION"
+          if [ -f allure-report.png ]; then
+            echo "✅ Screenshot exists"
+            ls -la allure-report.png
+          else
+            echo "❌ Screenshot not created"
+            # Не выходим с ошибкой, чтобы отправить ссылку
+          fi
+
+      - name: Send screenshot or link
+        run: |
+          if [ -f allure-report.png ]; then
+            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
+              -F chat_id=${{ github.event.inputs.chat_id }} \
+              -F photo=@allure-report.png \
+              -F caption="📊 Allure отчёт для ${{ matrix.browser }}"
+          else
+            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+              -d chat_id=${{ github.event.inputs.chat_id }} \
+              -d text="📊 Allure отчёт для ${{ matrix.browser }}%0A🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
 
   finalize:
     runs-on: ubuntu-latest
