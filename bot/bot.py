@@ -13,47 +13,12 @@ WORKFLOW_ID = 'run-tests.yml'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
-# ---- Установка вебхука при старте ----
-def set_webhook():
-    webhook_url = os.environ.get('RENDER_EXTERNAL_URL', 'https://beshenstvo-test-bot.onrender.com') + '/webhook'
-    try:
-        bot.remove_webhook()
-        bot.set_webhook(url=webhook_url)
-        print(f'✅ Webhook set to {webhook_url}')
-    except Exception as e:
-        print(f'❌ Failed to set webhook: {e}')
-
-set_webhook()
-
-# ---- Эндпоинты ----
-@app.route('/health', methods=['GET'])
-def health():
-    return 'OK', 200
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        print("📩 Webhook data received")
-        update = telebot.types.Update.de_json(json_string)
-        if update.message:
-            print(f"📩 Message from {update.message.from_user.first_name}: {update.message.text}")
-            # Прямая обработка сообщения
-            bot.process_new_messages([update.message])
-        else:
-            # Обработка других типов обновлений
-            bot.process_new_updates([update])
-        return 'OK', 200
-    return 'Bad Request', 400
-
-# ---- Обработчики команд ----
-@bot.message_handler(commands=['start'])
+# ---- Обработчики команд (функции) ----
 def send_welcome(message):
     print("🔥 /start handler called")
     name = message.from_user.first_name
     bot.reply_to(message, f"Привет, {name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы запустить тесты.")
 
-@bot.message_handler(commands=['run'])
 def run_tests(message):
     print("🔥 /run handler called")
     name = message.from_user.first_name
@@ -95,6 +60,41 @@ def wait_for_result(message, name):
             return
 
     bot.send_message(message.chat.id, f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\nhttps://github.com/{REPO_OWNER}/{REPO_NAME}/actions")
+
+# ---- Регистрация обработчиков ----
+bot.register_message_handler(send_welcome, commands=['start'])
+bot.register_message_handler(run_tests, commands=['run'])
+
+# ---- Установка вебхука ----
+def set_webhook():
+    webhook_url = os.environ.get('RENDER_EXTERNAL_URL', 'https://beshenstvo-test-bot.onrender.com') + '/webhook'
+    try:
+        bot.remove_webhook()
+        bot.set_webhook(url=webhook_url)
+        print(f'✅ Webhook set to {webhook_url}')
+    except Exception as e:
+        print(f'❌ Failed to set webhook: {e}')
+
+set_webhook()
+
+# ---- Эндпоинты Flask ----
+@app.route('/health', methods=['GET'])
+def health():
+    return 'OK', 200
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        print("📩 Webhook data received")
+        update = telebot.types.Update.de_json(json_string)
+        if update.message:
+            print(f"📩 Message from {update.message.from_user.first_name}: {update.message.text}")
+            bot.process_new_messages([update.message])
+        else:
+            bot.process_new_updates([update])
+        return 'OK', 200
+    return 'Bad Request', 400
 
 if __name__ == '__main__':
     # Gunicorn запускает app, поэтому app.run() не нужен
