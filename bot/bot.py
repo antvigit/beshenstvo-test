@@ -5,7 +5,6 @@ import time
 from flask import Flask, request
 
 BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
-CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID')
 GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
@@ -27,12 +26,19 @@ def run_tests(message):
     name = message.from_user.first_name
     bot.reply_to(message, f"🔄 {name}, запускаю тесты...")
 
+    chat_id = str(message.chat.id)  # берём chat_id пользователя
+
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
-    payload = {"ref": "master"}
+    payload = {
+        "ref": "master",
+        "inputs": {
+            "chat_id": chat_id   # передаём chat_id в GitHub Actions
+        }
+    }
     response = requests.post(url, json=payload, headers=headers)
 
     if response.status_code != 204:
