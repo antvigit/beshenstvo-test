@@ -13,6 +13,13 @@ WORKFLOW_ID = 'run-tests.yml'
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
+# ---- Сброс вебхука при старте (защита от 409) ----
+try:
+    bot.remove_webhook()
+    print("✅ Webhook removed on startup")
+except Exception as e:
+    print(f"⚠️ Failed to remove webhook: {e}")
+
 @app.route('/health', methods=['GET'])
 def health():
     return 'OK', 200
@@ -57,28 +64,38 @@ def run_tests(message):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    # Запускаем плавный прогресс
+    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ожидание завершения... (примерное время: до 5 минут)")
     wait_for_result(chat_id, progress_msg.message_id, name)
 
 def wait_for_result(chat_id, message_id, name):
-    # Плавный прогресс в течение 5 минут (300 секунд)
-    total_time = 300  # 5 минут
+    total_time = 300
     start_time = time.time()
     progress = 10
-    step = 2  # увеличиваем на 2% каждые 10 секунд
+    step = 2
 
     while True:
         elapsed = time.time() - start_time
         if elapsed >= total_time:
-            # Время вышло — считаем, что тесты должны были завершиться
             update_progress(chat_id, message_id, 95, "📊 Тесты завершены, ожидаю скриншоты...")
-            time.sleep(40)  # ждём отправки скриншотов
+            time.sleep(40)
             update_progress(chat_id, message_id, 100, "✅ Все тесты завершены!")
             return
 
-        # Обновляем прогресс каждые 10 секунд
         time.sleep(10)
         progress += step
         if progress > 90:
-            progress = 90  # не поднимаем выше 90%, пока не завершится таймер
+            progress = 90
         update_progress(chat_id, message_id, progress, f"⏳ Выполнение тестов... (примерное время: до 5 минут)")
+
+if __name__ == '__main__':
+    # Повторный сброс вебхука перед стартом
+    try:
+        bot.remove_webhook()
+        print("✅ Webhook removed before polling")
+    except Exception as e:
+        print(f"⚠️ Failed to remove webhook: {e}")
+
+    print("🤖 Бот запущен в режиме polling")
+    import threading
+    threading.Thread(target=app.run, kwargs={'host': '0.0.0.0', 'port': int(os.environ.get('PORT', 5000))}, daemon=True).start()
+    bot.polling()
