@@ -11,8 +11,9 @@
 - **Тесты:** Selenium 4, JUnit 5
 - **Отчёты:** Allure
 - **Архитектура:** Page Object Model + Page Factory, SOLID
-- **Бот:** TeleBot, Flask, Requests
-- **CI/CD:** GitHub Actions
+- **Бот:** TeleBot, Flask, Requests (вебхук)
+- **Контейнеризация:** Docker, Selenium Grid (Chrome + Firefox)
+- **CI/CD:** GitHub Actions (матрица браузеров)
 - **Хостинг:** Render
 
 ---
@@ -41,7 +42,16 @@
 | **D** (Dependency Inversion) | Зависимости должны строиться на абстракциях, а не на конкретиках. | Все страницы получают `WebDriver` через конструктор (`BasePage`), а не создают его сами. |
 
 ---
+## Docker и Selenium Grid
 
+Для запуска тестов в контейнерах используется **Docker Compose**, который поднимает Selenium Hub и узлы для Chrome и Firefox.
+
+```bash
+docker compose up -d
+```
+Тесты подключаются к Grid через переменные browser и grid.url
+
+---
 ## Тесты
 
 Основной тест — `shouldValidateVaccinationDates`:
@@ -61,20 +71,38 @@
 
 ## Telegram-бот
 
-Бот позволяет запускать тесты удалённо и получать результат в Telegram.
+Бот работает через вебхук (Flask) и позволяет запускать тесты удалённо.
 
-**Как использовать:**
-1. Напиши боту `/run`.
-2. Дождись сообщения о завершении.
-3. Открой скриншот или ссылку на отчёт.
+Команды:
+
+    /start — приветствие.
+
+    /run — запустить тесты в Chrome и Firefox.
+
+Что приходит:
+
+    Статус запуска (🔄)
+
+    Ожидание завершения (⏳)
+
+    Скриншот Allure-отчёта для каждого браузера с ссылкой на полный отчёт.
+
+    Финальное сообщение «✅ Все тесты завершены!»
 
 ---
 
 ## Запуск
 
-**Локально (bash):**
+**Локально:**
+```bash
 1. mvn clean test
 2. mvn allure:serve
+```
+
+**Локально с Docker (Selenium Grid)**
+docker compose up -d
+mvn clean test -Dbrowser=chrome -Dgrid.url=http://localhost:4444/wd/hub
+mvn allure:serve
 
 
 **Через бота**
