@@ -90,14 +90,31 @@ jobs:
             http://localhost:8080 \
             allure-report.png
 
-      - name: Send screenshot with link
+      - name: Check screenshot file
         run: |
-          CAPTION="📊 Allure отчёт для ${{ matrix.browser }}
-          🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
-            -F chat_id=${{ github.event.inputs.chat_id }} \
-            -F photo=@allure-report.png \
-            --data-urlencode "caption=$CAPTION"
+          if [ -f allure-report.png ]; then
+            echo "✅ Screenshot exists"
+            ls -la allure-report.png
+          else
+            echo "❌ Screenshot not found"
+          fi
+
+      - name: Send screenshot
+        run: |
+          if [ -f allure-report.png ]; then
+            curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendPhoto \
+              -F chat_id=${{ github.event.inputs.chat_id }} \
+              -F photo=@allure-report.png \
+              -F caption="📊 Allure отчёт для ${{ matrix.browser }}"
+          else
+            echo "Screenshot not found, skip sending"
+          fi
+
+      - name: Send link
+        run: |
+          curl -s -X POST https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage \
+            -d chat_id=${{ github.event.inputs.chat_id }} \
+            -d text="🔗 Ссылка: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
   finalize:
     runs-on: ubuntu-latest
