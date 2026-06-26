@@ -23,6 +23,21 @@ except Exception as e:
 def health():
     return 'OK', 200
 
+# === SELF-PING (чтобы Render не засыпал) ===
+def self_ping():
+    import time
+    import requests
+    while True:
+        time.sleep(120)
+        try:
+            requests.get('http://localhost:10000/health')
+            print("💓 Self-ping sent")
+        except Exception as e:
+            print(f"⚠️ Self-ping failed: {e}")
+
+import threading
+threading.Thread(target=self_ping, daemon=True).start()
+
 def update_progress(chat_id, message_id, progress, text):
     bar_length = 10
     filled = int(progress / 100 * bar_length)
