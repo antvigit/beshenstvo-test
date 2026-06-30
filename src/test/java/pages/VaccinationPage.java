@@ -16,14 +16,13 @@ import java.util.List;
 
 public class VaccinationPage extends BasePage {
 
-    // ===== СТАРЫЕ ЛОКАТОРЫ (для календаря) =====
+    // ===== ЛОКАТОРЫ =====
     @FindBy(xpath = "//*[contains(text(), 'План антирабической вакцинации')]")
     private WebElement tableTitle;
 
     @FindBy(xpath = "//*[contains(text(), '.') and contains(text(), ',') and string-length(text()) > 10]")
     private List<WebElement> dateRows;
 
-    // ===== НОВЫЕ ЛОКАТОРЫ (для формы) =====
     @FindBy(name = "fio")
     private WebElement fioField;
 
@@ -42,7 +41,7 @@ public class VaccinationPage extends BasePage {
         PageFactory.initElements(driver, this);
     }
 
-    // ===== СТАРЫЕ МЕТОДЫ (для календаря) =====
+    // ===== СТАРЫЕ МЕТОДЫ =====
     @Override
     @Step("Открыть страницу")
     public void open() {
@@ -60,7 +59,7 @@ public class VaccinationPage extends BasePage {
         return dateRows;
     }
 
-    // ===== НОВЫЕ МЕТОДЫ (для формы) =====
+    // ===== НОВЫЕ МЕТОДЫ =====
     @Step("Ввести ФИО: {fio}")
     public void enterFio(String fio) {
         waitForElementVisible(fioField);
@@ -87,34 +86,38 @@ public class VaccinationPage extends BasePage {
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
 
-        // Прокрутка к элементу (чтобы он точно был в области видимости)
+        // Прокрутка к элементу
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
         // Ждём, пока элемент станет кликабельным
         wait.until(ExpectedConditions.elementToBeClickable(field));
 
-        // Пытаемся ввести через sendKeys (имитация пользователя)
-        try {
-            field.click();
-            field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
-            field.sendKeys(date);
-            field.sendKeys(Keys.TAB);
-            if (date.equals(field.getAttribute("value"))) {
-                return; // Успешно
-            }
-        } catch (Exception e) {
-            // Игнорируем, переходим к JS
-        }
-
-        // Fallback через JavaScript
+        // Устанавливаем значение через JavaScript
         ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", field, date);
+
+        // Триггерим события input и change
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
                         "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));",
                 field
         );
+
+        // Потеря фокуса (имитация TAB)
         field.sendKeys(Keys.TAB);
+
+        // Проверяем, установилось ли значение
+        String currentValue = field.getAttribute("value");
+        if (!date.equals(currentValue)) {
+            // Если не установилось, повторяем с blur
+            ((JavascriptExecutor) driver).executeScript(
+                    "arguments[0].value = arguments[1];" +
+                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                    field, date
+            );
+        }
     }
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
@@ -123,8 +126,8 @@ public class VaccinationPage extends BasePage {
         submitButton.click();
     }
 
-    @Step("Проверить, что PDF открылся в новой вкладке")
-    public boolean isPdfOpenedInNewTab() {
+    @Step("Проверить, что PDF открылся и его содержимое валидно")
+    public boolean isPdfContentValid() {
         String mainWindowHandle = driver.getWindowHandle();
 
         try {
@@ -136,10 +139,37 @@ public class VaccinationPage extends BasePage {
         for (String windowHandle : driver.getWindowHandles()) {
             if (!windowHandle.equals(mainWindowHandle)) {
                 driver.switchTo().window(windowHandle);
-                String currentUrl = driver.getCurrentUrl();
+
+                String script =
+                        "return new Promise((resolve) => {" +
+                                "  fetch(arguments[0])" +
+                                "    .then(response => response.arrayBuffer())" +
+                                "    .then(buffer => {" +
+                                "      const bytes = new Uint8Array(buffer);" +
+                                "      const header = String.fromCharCode(...bytes.slice(0, 5));" +
+                                "      resolve({ size: bytes.length, header: header });" +
+                                "    })" +
+                                "    .catch(() => resolve(null));" +
+                                "});";
+
+                try {
+                    Object result = ((JavascriptExecutor) driver).executeScript(script, driver.getCurrentUrl());
+                    if (result != null) {
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String, Object> data = (java.util.Map<String, Object>) result;
+                        String header = (String) data.get("header");
+                        Long size = (Long) data.get("size");
+                        driver.close();
+                        driver.switchTo().window(mainWindowHandle);
+                        return header != null && header.startsWith("%PDF") && size > 0;
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 driver.close();
                 driver.switchTo().window(mainWindowHandle);
-                return currentUrl != null && currentUrl.startsWith("blob:");
+                return false;
             }
         }
         return false;
