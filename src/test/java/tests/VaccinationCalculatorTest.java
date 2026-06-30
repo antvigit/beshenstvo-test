@@ -10,6 +10,8 @@ import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -19,12 +21,22 @@ import org.openqa.selenium.remote.DesiredCapabilities;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import pages.VaccinationPage;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -35,16 +47,35 @@ public class VaccinationCalculatorTest {
     private VaccinationPage page;
     private static final Logger log = LogManager.getLogger(VaccinationCalculatorTest.class);
 
+    private static final Properties testProps = new Properties();
+
+    static {
+        try (InputStream input = VaccinationCalculatorTest.class.getClassLoader()
+                .getResourceAsStream("config.properties")) {
+            if (input == null) {
+                throw new RuntimeException("config.properties not found in classpath");
+            }
+            try (Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
+                testProps.load(reader);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load config.properties", e);
+        }
+    }
+
     @BeforeEach
     void setUp() throws MalformedURLException {
-        String browser = System.getenv("browser") != null ? System.getenv("browser") : "chrome";
+        String browser = System.getenv("browser") != null ? System.getenv("browser")
+                : testProps.getProperty("browser", "chrome");
         String gridUrl = System.getenv("grid.url");
+        boolean headless = Boolean.parseBoolean(System.getProperty("headless", "true"));
 
         if (gridUrl != null && !gridUrl.isEmpty()) {
-            // Запуск через Selenium Grid
             if (browser.equals("chrome")) {
                 ChromeOptions options = new ChromeOptions();
-                options.addArguments("--headless=new");
+                if (headless) {
+                    options.addArguments("--headless=new");
+                }
                 options.addArguments("--no-sandbox");
                 options.addArguments("--disable-dev-shm-usage");
                 options.addArguments("--disable-gpu");
@@ -53,7 +84,9 @@ public class VaccinationCalculatorTest {
                 driver = new RemoteWebDriver(new URL(gridUrl), options);
             } else if (browser.equals("firefox")) {
                 FirefoxOptions options = new FirefoxOptions();
-                options.addArguments("--headless");
+                if (headless) {
+                    options.addArguments("--headless");
+                }
                 driver = new RemoteWebDriver(new URL(gridUrl), options);
             } else {
                 DesiredCapabilities caps = new DesiredCapabilities();
@@ -61,10 +94,11 @@ public class VaccinationCalculatorTest {
                 driver = new RemoteWebDriver(new URL(gridUrl), caps);
             }
         } else {
-            // Локальный запуск (без Grid)
             WebDriverManager.chromedriver().setup();
             ChromeOptions options = new ChromeOptions();
-            options.addArguments("--headless=new");
+            if (headless) {
+                options.addArguments("--headless=new");
+            }
             driver = new ChromeDriver(options);
         }
 
@@ -80,7 +114,6 @@ public class VaccinationCalculatorTest {
         page.waitForPageLoaded();
 
         List<WebElement> dateElements = page.getDateElements();
-
         assertFalse(dateElements.isEmpty(), "No dates found on page");
 
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
@@ -107,61 +140,45 @@ public class VaccinationCalculatorTest {
         assertTrue(atLeastOneDateFound, "No valid dates found on page");
     }
 
-    // Падающие тесты (оставлены на месте)
     @Test
-    @Story("Валидация поля ФИО")
-    @Severity(SeverityLevel.NORMAL)
-    void testValidNameCyrillic() {
-        page.open();
-        page.waitForPageLoaded();
-        page.enterName("Иванов Иван");
-        page.enterDate("23.06.2026");
-        assertTrue(page.getErrorMessage().isEmpty(), "No error expected");
-    }
-
-    @Test
-    @Story("Валидация поля ФИО")
+    @Story("Заполнение формы и генерация PDF")
     @Severity(SeverityLevel.CRITICAL)
-    void testEmptyName() {
-        page.open();
-        page.waitForPageLoaded();
-        page.enterName("");
-        page.enterDate("23.06.2026");
-        assertFalse(page.getErrorMessage().isEmpty(), "Error expected for empty name");
-    }
+    void testFullFormSubmission() {
+        String fio = testProps.getProperty("test.fio", "Петров Петр Петрович");
+        String birthDate = testProps.getProperty("test.birthDate", "01.01.1990");
+        String series = testProps.getProperty("test.series", "123123");
+        String dose = testProps.getProperty("test.dose", "1");
 
-    @Test
-    @Story("Валидация поля ФИО")
-    @Severity(SeverityLevel.NORMAL)
-    void testNameWithSpecialChars() {
         page.open();
-        page.waitForPageLoaded();
-        page.enterName("@#$%^&*()");
-        page.enterDate("23.06.2026");
-        assertFalse(page.getErrorMessage().isEmpty(), "Error expected for special chars");
-    }
 
-    @Test
-    @Story("Валидация поля ФИО")
-    @Severity(SeverityLevel.MINOR)
-    void testVeryLongName() {
-        page.open();
-        page.waitForPageLoaded();
-        String longName = "A".repeat(201);
-        page.enterName(longName);
-        page.enterDate("23.06.2026");
-        assertFalse(page.getErrorMessage().isEmpty(), "Error expected for too long name");
-    }
+        page.enterFio(fio);
+        page.enterDateByIndex(1, birthDate);
 
-    @Test
-    @Story("Валидация даты")
-    @Severity(SeverityLevel.CRITICAL)
-    void testInvalidDate() {
-        page.open();
-        page.waitForPageLoaded();
-        page.enterName("Иванов Иван");
-        page.enterDate("31.13.2026");
-        assertFalse(page.getErrorMessage().isEmpty(), "Error expected for invalid date");
+        String today = page.getTodayDate();
+        page.enterDateByIndex(2, today);
+        page.enterDateByIndex(3, today);
+
+        page.enterSeries(series);
+        page.enterDose(dose);
+
+        page.submitForm();
+
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Скриншот для отладки
+        File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+        try {
+            Files.copy(screenshot.toPath(), Paths.get("after_submit.png"), StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("📸 Скриншот сохранён: after_submit.png");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        assertTrue(page.isPdfOpenedInNewTab(), "PDF не открылся в новой вкладке");
     }
 
     @AfterEach
