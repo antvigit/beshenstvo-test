@@ -16,13 +16,14 @@ import java.util.List;
 
 public class VaccinationPage extends BasePage {
 
-    // ===== ЛОКАТОРЫ =====
+    // ===== СТАРЫЕ ЛОКАТОРЫ (для календаря) =====
     @FindBy(xpath = "//*[contains(text(), 'План антирабической вакцинации')]")
     private WebElement tableTitle;
 
     @FindBy(xpath = "//*[contains(text(), '.') and contains(text(), ',') and string-length(text()) > 10]")
     private List<WebElement> dateRows;
 
+    // ===== НОВЫЕ ЛОКАТОРЫ (для формы) =====
     @FindBy(name = "fio")
     private WebElement fioField;
 
@@ -41,7 +42,7 @@ public class VaccinationPage extends BasePage {
         PageFactory.initElements(driver, this);
     }
 
-    // ===== СТАРЫЕ МЕТОДЫ =====
+    // ===== СТАРЫЕ МЕТОДЫ (для календаря) =====
     @Override
     @Step("Открыть страницу")
     public void open() {
@@ -59,7 +60,7 @@ public class VaccinationPage extends BasePage {
         return dateRows;
     }
 
-    // ===== НОВЫЕ МЕТОДЫ =====
+    // ===== НОВЫЕ МЕТОДЫ (для формы) =====
     @Step("Ввести ФИО: {fio}")
     public void enterFio(String fio) {
         waitForElementVisible(fioField);
@@ -86,40 +87,34 @@ public class VaccinationPage extends BasePage {
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
 
+        // Прокрутка к элементу (чтобы он точно был в области видимости)
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
+
+        // Ждём, пока элемент станет кликабельным
+        wait.until(ExpectedConditions.elementToBeClickable(field));
+
         // Пытаемся ввести через sendKeys (имитация пользователя)
         try {
             field.click();
             field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
             field.sendKeys(date);
             field.sendKeys(Keys.TAB);
-            String currentValue = field.getAttribute("value");
-            if (date.equals(currentValue)) {
-                return;
+            if (date.equals(field.getAttribute("value"))) {
+                return; // Успешно
             }
         } catch (Exception e) {
-            // игнорируем, переходим к JS
+            // Игнорируем, переходим к JS
         }
 
-        // Fallback: JavaScript
+        // Fallback через JavaScript
         ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", field, date);
         ((JavascriptExecutor) driver).executeScript(
-                "var evt = new Event('input', { bubbles: true }); arguments[0].dispatchEvent(evt);" +
-                        "var evt2 = new Event('change', { bubbles: true }); arguments[0].dispatchEvent(evt2);",
+                "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
+                        "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));",
                 field
         );
         field.sendKeys(Keys.TAB);
-
-        // Если не установилось, пробуем принудительно с blur
-        String finalValue = field.getAttribute("value");
-        if (!date.equals(finalValue)) {
-            ((JavascriptExecutor) driver).executeScript(
-                    "arguments[0].value = arguments[1];" +
-                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
-                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
-                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
-                    field, date
-            );
-        }
     }
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
