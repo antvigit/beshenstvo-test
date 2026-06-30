@@ -6,7 +6,6 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -17,14 +16,13 @@ import java.util.List;
 
 public class VaccinationPage extends BasePage {
 
-    // ===== СТАРЫЕ ЛОКАТОРЫ (для календаря) =====
+    // ===== ЛОКАТОРЫ =====
     @FindBy(xpath = "//*[contains(text(), 'План антирабической вакцинации')]")
     private WebElement tableTitle;
 
     @FindBy(xpath = "//*[contains(text(), '.') and contains(text(), ',') and string-length(text()) > 10]")
     private List<WebElement> dateRows;
 
-    // ===== НОВЫЕ ЛОКАТОРЫ (для формы) =====
     @FindBy(name = "fio")
     private WebElement fioField;
 
@@ -43,7 +41,7 @@ public class VaccinationPage extends BasePage {
         PageFactory.initElements(driver, this);
     }
 
-    // ===== СТАРЫЕ МЕТОДЫ (для календаря) =====
+    // ===== СТАРЫЕ МЕТОДЫ =====
     @Override
     @Step("Открыть страницу")
     public void open() {
@@ -61,7 +59,7 @@ public class VaccinationPage extends BasePage {
         return dateRows;
     }
 
-    // ===== НОВЫЕ МЕТОДЫ (для формы) =====
+    // ===== НОВЫЕ МЕТОДЫ =====
     @Step("Ввести ФИО: {fio}")
     public void enterFio(String fio) {
         waitForElementVisible(fioField);
@@ -88,17 +86,40 @@ public class VaccinationPage extends BasePage {
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
 
-        // Ставим фокус
-        field.click();
+        // Пытаемся ввести через sendKeys (имитация пользователя)
+        try {
+            field.click();
+            field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
+            field.sendKeys(date);
+            field.sendKeys(Keys.TAB);
+            String currentValue = field.getAttribute("value");
+            if (date.equals(currentValue)) {
+                return;
+            }
+        } catch (Exception e) {
+            // игнорируем, переходим к JS
+        }
 
-        // Выделяем весь текст (Ctrl+A)
-        field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
-
-        // Вводим новую дату
-        field.sendKeys(date);
-
-        // Подтверждаем ввод
+        // Fallback: JavaScript
+        ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", field, date);
+        ((JavascriptExecutor) driver).executeScript(
+                "var evt = new Event('input', { bubbles: true }); arguments[0].dispatchEvent(evt);" +
+                        "var evt2 = new Event('change', { bubbles: true }); arguments[0].dispatchEvent(evt2);",
+                field
+        );
         field.sendKeys(Keys.TAB);
+
+        // Если не установилось, пробуем принудительно с blur
+        String finalValue = field.getAttribute("value");
+        if (!date.equals(finalValue)) {
+            ((JavascriptExecutor) driver).executeScript(
+                    "arguments[0].value = arguments[1];" +
+                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                    field, date
+            );
+        }
     }
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
@@ -111,14 +132,12 @@ public class VaccinationPage extends BasePage {
     public boolean isPdfOpenedInNewTab() {
         String mainWindowHandle = driver.getWindowHandle();
 
-        // Ждём открытия новой вкладки
         try {
             wait.until(ExpectedConditions.numberOfWindowsToBe(2));
         } catch (Exception e) {
             return false;
         }
 
-        // Переключаемся на новую вкладку
         for (String windowHandle : driver.getWindowHandles()) {
             if (!windowHandle.equals(mainWindowHandle)) {
                 driver.switchTo().window(windowHandle);
