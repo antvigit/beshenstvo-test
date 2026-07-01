@@ -59,19 +59,24 @@ public class VaccinationPage extends BasePage {
         return dateRows;
     }
 
-    // ===== УНИВЕРСАЛЬНЫЙ МЕТОД ДЛЯ ВВОДА ТЕКСТА =====
+    // ===== УНИВЕРСАЛЬНЫЙ МЕТОД ДЛЯ ВВОДА ТЕКСТА (ТОЛЬКО JS) =====
     private void setFieldValue(WebElement field, String value) {
+        // Прокрутка к элементу
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
+        // Ждём, пока элемент станет видимым и кликабельным
+        wait.until(ExpectedConditions.visibilityOf(field));
         wait.until(ExpectedConditions.elementToBeClickable(field));
 
+        // Устанавливаем фокус и кликаем через JavaScript
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].focus();" +
                         "arguments[0].click();",
                 field
         );
 
+        // Устанавливаем значение
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].value = arguments[1];" +
                         "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
@@ -80,7 +85,7 @@ public class VaccinationPage extends BasePage {
                 field, value
         );
 
-        // Проверка и повторная установка
+        // Проверка и повторная установка при необходимости
         String currentValue = field.getAttribute("value");
         if (!value.equals(currentValue)) {
             ((JavascriptExecutor) driver).executeScript(
@@ -93,7 +98,7 @@ public class VaccinationPage extends BasePage {
         }
     }
 
-    // ===== НОВЫЕ МЕТОДЫ (используют универсальный) =====
+    // ===== МЕТОДЫ ВВОДА =====
     @Step("Ввести ФИО: {fio}")
     public void enterFio(String fio) {
         setFieldValue(fioField, fio);
@@ -113,28 +118,30 @@ public class VaccinationPage extends BasePage {
     public void enterDateByIndex(int index, String date) {
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
+
+        // Используем универсальный метод
         setFieldValue(field, date);
 
-        // Закрываем календарь (если он открылся)
-        field.sendKeys(Keys.ESCAPE);
-        try { Thread.sleep(200); } catch (InterruptedException e) {}
+        // Закрываем календарь, если он открылся
+        try {
+            field.sendKeys(Keys.ESCAPE);
+            Thread.sleep(200);
+        } catch (Exception e) {
+            // Если не удалось закрыть календарь — игнорируем
+        }
     }
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
     public void submitForm() {
-        wait.until(ExpectedConditions.elementToBeClickable(submitButton));
-
         // Прокрутка к кнопке
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", submitButton);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
-        // Пытаемся кликнуть через JavaScript (обходит перекрытие)
-        try {
-            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", submitButton);
-        } catch (Exception e) {
-            // Если JS-клик не сработал, пробуем обычный клик
-            submitButton.click();
-        }
+        // Ждём кликабельности
+        wait.until(ExpectedConditions.elementToBeClickable(submitButton));
+
+        // Клик через JavaScript (обходит перекрытие)
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", submitButton);
     }
 
     @Step("Проверить, что PDF открылся в новой вкладке")
