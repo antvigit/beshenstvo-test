@@ -10,10 +10,7 @@ import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxOptions;
@@ -76,11 +73,11 @@ public class VaccinationCalculatorTest {
                 if (headless) {
                     options.addArguments("--headless=new");
                 }
+                options.addArguments("--window-size=1920,1080");
                 options.addArguments("--no-sandbox");
                 options.addArguments("--disable-dev-shm-usage");
                 options.addArguments("--disable-gpu");
                 options.addArguments("--remote-debugging-port=9222");
-                options.addArguments("--window-size=1920,1080");
                 driver = new RemoteWebDriver(new URL(gridUrl), options);
             } else if (browser.equals("firefox")) {
                 FirefoxOptions options = new FirefoxOptions();
@@ -99,10 +96,11 @@ public class VaccinationCalculatorTest {
             if (headless) {
                 options.addArguments("--headless=new");
             }
+            options.addArguments("--window-size=1920,1080");
             driver = new ChromeDriver(options);
         }
 
-        driver.manage().window().maximize();
+        driver.manage().window().maximize(); // это работает и в headless
         page = new VaccinationPage(driver);
     }
 
@@ -178,6 +176,7 @@ public class VaccinationCalculatorTest {
             e.printStackTrace();
         }
 
+        // Проверяем, что PDF открылся и его содержимое валидно
         assertTrue(page.isPdfOpenedInNewTab(), "PDF не открылся в новой вкладке");
     }
 

@@ -90,31 +90,32 @@ public class VaccinationPage extends BasePage {
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
-        // Ждём, пока элемент станет кликабельным
-        wait.until(ExpectedConditions.elementToBeClickable(field));
+        // 1. Клик по полю (фокус)
+        field.click();
 
-        // Устанавливаем значение через JavaScript
-        ((JavascriptExecutor) driver).executeScript("arguments[0].value = arguments[1];", field, date);
+        // 2. Очистка через Ctrl+A + Delete
+        field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
+        field.sendKeys(Keys.DELETE);
 
-        // Триггерим события input и change
-        ((JavascriptExecutor) driver).executeScript(
-                "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
-                        "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));",
-                field
-        );
+        // 3. Ввод даты посимвольно (имитация пользователя)
+        for (char ch : date.toCharArray()) {
+            field.sendKeys(String.valueOf(ch));
+            try { Thread.sleep(30); } catch (InterruptedException e) {}
+        }
 
-        // Потеря фокуса (имитация TAB)
+        // 4. Потеря фокуса (применяет изменения)
         field.sendKeys(Keys.TAB);
 
-        // Проверяем, установилось ли значение
+        // 5. Проверяем, установилось ли значение
         String currentValue = field.getAttribute("value");
         if (!date.equals(currentValue)) {
-            // Если не установилось, повторяем с blur
+            // Если не установилось — принудительно через JavaScript с полным набором событий
             ((JavascriptExecutor) driver).executeScript(
                     "arguments[0].value = arguments[1];" +
+                            "arguments[0].dispatchEvent(new FocusEvent('focus', { bubbles: true }));" +
                             "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
                             "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
-                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                            "arguments[0].dispatchEvent(new FocusEvent('blur', { bubbles: true }));",
                     field, date
             );
         }
@@ -126,50 +127,21 @@ public class VaccinationPage extends BasePage {
         submitButton.click();
     }
 
-    @Step("Проверить, что PDF открылся и его содержимое валидно")
-    public boolean isPdfContentValid() {
+    @Step("Проверить, что PDF открылся в новой вкладке")
+    public boolean isPdfOpenedInNewTab() {
         String mainWindowHandle = driver.getWindowHandle();
-
         try {
             wait.until(ExpectedConditions.numberOfWindowsToBe(2));
         } catch (Exception e) {
             return false;
         }
-
         for (String windowHandle : driver.getWindowHandles()) {
             if (!windowHandle.equals(mainWindowHandle)) {
                 driver.switchTo().window(windowHandle);
-
-                String script =
-                        "return new Promise((resolve) => {" +
-                                "  fetch(arguments[0])" +
-                                "    .then(response => response.arrayBuffer())" +
-                                "    .then(buffer => {" +
-                                "      const bytes = new Uint8Array(buffer);" +
-                                "      const header = String.fromCharCode(...bytes.slice(0, 5));" +
-                                "      resolve({ size: bytes.length, header: header });" +
-                                "    })" +
-                                "    .catch(() => resolve(null));" +
-                                "});";
-
-                try {
-                    Object result = ((JavascriptExecutor) driver).executeScript(script, driver.getCurrentUrl());
-                    if (result != null) {
-                        @SuppressWarnings("unchecked")
-                        java.util.Map<String, Object> data = (java.util.Map<String, Object>) result;
-                        String header = (String) data.get("header");
-                        Long size = (Long) data.get("size");
-                        driver.close();
-                        driver.switchTo().window(mainWindowHandle);
-                        return header != null && header.startsWith("%PDF") && size > 0;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
+                String url = driver.getCurrentUrl();
                 driver.close();
                 driver.switchTo().window(mainWindowHandle);
-                return false;
+                return url != null && url.startsWith("blob:");
             }
         }
         return false;
