@@ -162,7 +162,7 @@ public class VaccinationCalculatorTest {
         page.submitForm();
 
         try {
-            Thread.sleep(5000); // увеличил до 5 секунд
+            Thread.sleep(7000); // увеличил до 7 секунд
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

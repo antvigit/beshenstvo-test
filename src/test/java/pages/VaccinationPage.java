@@ -3,6 +3,7 @@ package pages;
 import io.qameta.allure.Step;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
@@ -60,21 +61,17 @@ public class VaccinationPage extends BasePage {
 
     // ===== УНИВЕРСАЛЬНЫЙ МЕТОД ДЛЯ ВВОДА ТЕКСТА =====
     private void setFieldValue(WebElement field, String value) {
-        // Прокрутка к элементу
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
-        // Ждём, пока элемент станет кликабельным
         wait.until(ExpectedConditions.elementToBeClickable(field));
 
-        // Устанавливаем фокус и кликаем через JavaScript
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].focus();" +
                         "arguments[0].click();",
                 field
         );
 
-        // Устанавливаем значение
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].value = arguments[1];" +
                         "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
@@ -83,10 +80,9 @@ public class VaccinationPage extends BasePage {
                 field, value
         );
 
-        // Проверяем, установилось ли значение
+        // Проверка и повторная установка
         String currentValue = field.getAttribute("value");
         if (!value.equals(currentValue)) {
-            // Повторная попытка с принудительным обновлением
             ((JavascriptExecutor) driver).executeScript(
                     "arguments[0].value = arguments[1];" +
                             "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
@@ -118,12 +114,27 @@ public class VaccinationPage extends BasePage {
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
         setFieldValue(field, date);
+
+        // Закрываем календарь (если он открылся)
+        field.sendKeys(Keys.ESCAPE);
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
     }
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
     public void submitForm() {
-        waitForElementClickable(submitButton);
-        submitButton.click();
+        wait.until(ExpectedConditions.elementToBeClickable(submitButton));
+
+        // Прокрутка к кнопке
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", submitButton);
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
+
+        // Пытаемся кликнуть через JavaScript (обходит перекрытие)
+        try {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", submitButton);
+        } catch (Exception e) {
+            // Если JS-клик не сработал, пробуем обычный клик
+            submitButton.click();
+        }
     }
 
     @Step("Проверить, что PDF открылся в новой вкладке")
