@@ -10,7 +10,11 @@ import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.*;
+import org.openqa.selenium.Dimension;
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.firefox.FirefoxOptions;
@@ -100,10 +104,11 @@ public class VaccinationCalculatorTest {
             driver = new ChromeDriver(options);
         }
 
-        driver.manage().window().maximize(); // это работает и в headless
+        driver.manage().window().maximize();
         page = new VaccinationPage(driver);
     }
 
+    // ===== ТЕСТ 1: ПРОВЕРКА ДАТ ВАКЦИНАЦИИ =====
     @Test
     @Story("Проверка дат вакцинации")
     @Severity(SeverityLevel.CRITICAL)
@@ -138,6 +143,7 @@ public class VaccinationCalculatorTest {
         assertTrue(atLeastOneDateFound, "No valid dates found on page");
     }
 
+    // ===== ТЕСТ 2: ЗАПОЛНЕНИЕ ФОРМЫ И ГЕНЕРАЦИЯ PDF =====
     @Test
     @Story("Заполнение формы и генерация PDF")
     @Severity(SeverityLevel.CRITICAL)
@@ -152,6 +158,10 @@ public class VaccinationCalculatorTest {
         page.enterFio(fio);
         page.enterDateByIndex(1, birthDate);
 
+        // ПРОВЕРКА: убеждаемся, что дата рождения действительно введена
+        String actualBirthDate = page.getDateValueByIndex(1);
+        assertEquals(birthDate, actualBirthDate, "Дата рождения не отображается корректно");
+
         String today = page.getTodayDate();
         page.enterDateByIndex(2, today);
         page.enterDateByIndex(3, today);
@@ -162,8 +172,17 @@ public class VaccinationCalculatorTest {
         page.submitForm();
 
         try {
-            Thread.sleep(7000); // увеличил до 7 секунд
+            Thread.sleep(7000);
         } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Скриншот для отладки (перезаписываем, если существует)
+        File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+        try {
+            Files.copy(screenshot.toPath(), Paths.get("after_submit.png"), StandardCopyOption.REPLACE_EXISTING);
+            System.out.println("📸 Скриншот сохранён: after_submit.png");
+        } catch (IOException e) {
             e.printStackTrace();
         }
 

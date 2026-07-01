@@ -9,7 +9,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
-
+import org.openqa.selenium.interactions.Actions;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -59,7 +59,7 @@ public class VaccinationPage extends BasePage {
         return dateRows;
     }
 
-    // ===== УНИВЕРСАЛЬНЫЙ МЕТОД ДЛЯ ВВОДА ТЕКСТА (ТОЛЬКО JS) =====
+    // ===== УНИВЕРСАЛЬНЫЙ МЕТОД ДЛЯ ВВОДА ТЕКСТА =====
     private void setFieldValue(WebElement field, String value) {
         // Прокрутка к элементу
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
@@ -76,23 +76,24 @@ public class VaccinationPage extends BasePage {
                 field
         );
 
-        // Устанавливаем значение
+        // Устанавливаем значение через JavaScript
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].value = arguments[1];" +
-                        "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
-                        "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
-                        "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                        "arguments[0].dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));" +
+                        "arguments[0].dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));" +
+                        "arguments[0].dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));",
                 field, value
         );
 
         // Проверка и повторная установка при необходимости
         String currentValue = field.getAttribute("value");
         if (!value.equals(currentValue)) {
+            // Если не установилось, пробуем ещё раз с дополнительными событиями
             ((JavascriptExecutor) driver).executeScript(
                     "arguments[0].value = arguments[1];" +
-                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
-                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
-                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));" +
+                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));" +
+                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));",
                     field, value
             );
         }
@@ -119,17 +120,82 @@ public class VaccinationPage extends BasePage {
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
 
-        // Используем универсальный метод
-        setFieldValue(field, date);
+        // Прокрутка к элементу
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
 
-        // Закрываем календарь, если он открылся
-        try {
+        // Ждём кликабельности
+        wait.until(ExpectedConditions.elementToBeClickable(field));
+
+        // Клик по полю (фокус)
+        field.click();
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
+
+        // Очистка через JavaScript
+        ((JavascriptExecutor) driver).executeScript("arguments[0].value = '';", field);
+
+        // Установка значения с принудительным обновлением маски
+        ((JavascriptExecutor) driver).executeScript(
+                "var el = arguments[0];" +
+                        "el.value = arguments[1];" +
+                        "el.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));" +
+                        "el.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));" +
+                        "el.dispatchEvent(new Event('blur', { bubbles: true, cancelable: true }));" +
+                        "el.setSelectionRange(arguments[1].length, arguments[1].length);" +
+                        "el.focus();" +
+                        "el.blur();",
+                field, date
+        );
+
+        // Потеря фокуса для применения
+        field.sendKeys(Keys.TAB);
+        try { Thread.sleep(300); } catch (InterruptedException e) {}
+
+        // Проверка: если значение не установилось — fallback через Actions (посимвольный ввод)
+        String currentValue = field.getAttribute("value");
+        if (!date.equals(currentValue)) {
+            // Очищаем через Ctrl+A + Delete
+            field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
+            field.sendKeys(Keys.DELETE);
+
+            // Вводим посимвольно с задержкой
+            for (char ch : date.toCharArray()) {
+                field.sendKeys(String.valueOf(ch));
+                try { Thread.sleep(50); } catch (InterruptedException e) {}
+            }
+            field.sendKeys(Keys.TAB);
+        }
+
+        // Если всё ещё не установилось — принудительно через календарь (только для даты рождения)
+        String finalValue = field.getAttribute("value");
+        if (!date.equals(finalValue) && index == 1) {
+            // Открываем календарь
+            field.click();
+            try { Thread.sleep(500); } catch (InterruptedException e) {}
+
+            // Парсим день
+            String day = date.split("\\.")[0];
+            // Ищем кнопку с этим числом
+            By dayLocator = By.xpath("//button[contains(@class, 'MuiPickersDay-root') and text()='" + day + "']");
+            try {
+                WebElement dayButton = wait.until(ExpectedConditions.elementToBeClickable(dayLocator));
+                dayButton.click();
+                try { Thread.sleep(300); } catch (InterruptedException e) {}
+            } catch (Exception e) {
+                // Если не нашли — игнорируем
+            }
+            // Закрываем календарь
             field.sendKeys(Keys.ESCAPE);
-            Thread.sleep(200);
-        } catch (Exception e) {
-            // Если не удалось закрыть календарь — игнорируем
         }
     }
+
+    @Step("Получить значение даты по индексу {index}")
+    public String getDateValueByIndex(int index) {
+        By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
+        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
+        return field.getAttribute("value");
+    }
+
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
     public void submitForm() {
