@@ -3,7 +3,6 @@ package pages;
 import io.qameta.allure.Step;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.FindBy;
@@ -59,65 +58,66 @@ public class VaccinationPage extends BasePage {
         return dateRows;
     }
 
-    // ===== НОВЫЕ МЕТОДЫ =====
-    @Step("Ввести ФИО: {fio}")
-    public void enterFio(String fio) {
-        waitForElementVisible(fioField);
-        fioField.clear();
-        fioField.sendKeys(fio);
-    }
-
-    @Step("Ввести серию: {series}")
-    public void enterSeries(String series) {
-        waitForElementVisible(seriesField);
-        seriesField.clear();
-        seriesField.sendKeys(series);
-    }
-
-    @Step("Ввести дозу: {dose}")
-    public void enterDose(String dose) {
-        waitForElementVisible(doseField);
-        doseField.clear();
-        doseField.sendKeys(dose);
-    }
-
-    @Step("Ввести дату в поле по номеру {index}")
-    public void enterDateByIndex(int index, String date) {
-        By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
-        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
-
+    // ===== УНИВЕРСАЛЬНЫЙ МЕТОД ДЛЯ ВВОДА ТЕКСТА =====
+    private void setFieldValue(WebElement field, String value) {
         // Прокрутка к элементу
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
-        // Принудительно делаем элемент кликабельным и фокусируемся
+        // Ждём, пока элемент станет кликабельным
+        wait.until(ExpectedConditions.elementToBeClickable(field));
+
+        // Устанавливаем фокус и кликаем через JavaScript
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].focus();" +
                         "arguments[0].click();",
                 field
         );
 
-        // Устанавливаем значение через JavaScript
+        // Устанавливаем значение
         ((JavascriptExecutor) driver).executeScript(
                 "arguments[0].value = arguments[1];" +
                         "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
                         "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
                         "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
-                field, date
+                field, value
         );
 
-        // Проверяем, что значение установилось
+        // Проверяем, установилось ли значение
         String currentValue = field.getAttribute("value");
-        if (!date.equals(currentValue)) {
+        if (!value.equals(currentValue)) {
             // Повторная попытка с принудительным обновлением
             ((JavascriptExecutor) driver).executeScript(
                     "arguments[0].value = arguments[1];" +
                             "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
                             "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
                             "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
-                    field, date
+                    field, value
             );
         }
+    }
+
+    // ===== НОВЫЕ МЕТОДЫ (используют универсальный) =====
+    @Step("Ввести ФИО: {fio}")
+    public void enterFio(String fio) {
+        setFieldValue(fioField, fio);
+    }
+
+    @Step("Ввести серию: {series}")
+    public void enterSeries(String series) {
+        setFieldValue(seriesField, series);
+    }
+
+    @Step("Ввести дозу: {dose}")
+    public void enterDose(String dose) {
+        setFieldValue(doseField, dose);
+    }
+
+    @Step("Ввести дату в поле по номеру {index}")
+    public void enterDateByIndex(int index, String date) {
+        By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
+        WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
+        setFieldValue(field, date);
     }
 
     @Step("Нажать кнопку 'Сформировать план вакцинации'")
