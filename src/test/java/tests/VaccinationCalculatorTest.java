@@ -162,21 +162,11 @@ public class VaccinationCalculatorTest {
         page.submitForm();
 
         try {
-            Thread.sleep(3000);
+            Thread.sleep(5000); // увеличил до 5 секунд
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        // Скриншот для отладки
-        File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-        try {
-            Files.copy(screenshot.toPath(), Paths.get("after_submit.png"), StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("📸 Скриншот сохранён: after_submit.png");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        // Проверяем, что PDF открылся и его содержимое валидно
         assertTrue(page.isPdfOpenedInNewTab(), "PDF не открылся в новой вкладке");
     }
 

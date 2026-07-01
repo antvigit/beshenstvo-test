@@ -90,32 +90,31 @@ public class VaccinationPage extends BasePage {
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         try { Thread.sleep(200); } catch (InterruptedException e) {}
 
-        // 1. Клик по полю (фокус)
-        field.click();
+        // Принудительно делаем элемент кликабельным и фокусируемся
+        ((JavascriptExecutor) driver).executeScript(
+                "arguments[0].focus();" +
+                        "arguments[0].click();",
+                field
+        );
 
-        // 2. Очистка через Ctrl+A + Delete
-        field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
-        field.sendKeys(Keys.DELETE);
+        // Устанавливаем значение через JavaScript
+        ((JavascriptExecutor) driver).executeScript(
+                "arguments[0].value = arguments[1];" +
+                        "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
+                        "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
+                        "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                field, date
+        );
 
-        // 3. Ввод даты посимвольно (имитация пользователя)
-        for (char ch : date.toCharArray()) {
-            field.sendKeys(String.valueOf(ch));
-            try { Thread.sleep(30); } catch (InterruptedException e) {}
-        }
-
-        // 4. Потеря фокуса (применяет изменения)
-        field.sendKeys(Keys.TAB);
-
-        // 5. Проверяем, установилось ли значение
+        // Проверяем, что значение установилось
         String currentValue = field.getAttribute("value");
         if (!date.equals(currentValue)) {
-            // Если не установилось — принудительно через JavaScript с полным набором событий
+            // Повторная попытка с принудительным обновлением
             ((JavascriptExecutor) driver).executeScript(
                     "arguments[0].value = arguments[1];" +
-                            "arguments[0].dispatchEvent(new FocusEvent('focus', { bubbles: true }));" +
                             "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
                             "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
-                            "arguments[0].dispatchEvent(new FocusEvent('blur', { bubbles: true }));",
+                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
                     field, date
             );
         }
