@@ -230,6 +230,7 @@ public class VaccinationCalculatorTest {
     void shouldToggleDarkTheme() {
         page.open();
         page.waitForPageLoaded();
+        page.waitForStableBackgroundColor();
 
         String lightBackground = page.getBodyBackgroundColor();
         String lightLabel = page.getThemeToggleLabel();
@@ -243,7 +244,6 @@ public class VaccinationCalculatorTest {
         assertNotEquals(lightLabel, darkLabel, "Подпись кнопки переключения темы должна измениться");
 
         page.toggleTheme();
-        page.waitForBackgroundColor(lightBackground);
         assertEquals(lightBackground, page.getBodyBackgroundColor(), "Цвет фона должен вернуться к исходному");
     }
 

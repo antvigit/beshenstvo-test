@@ -247,6 +247,26 @@ public class VaccinationPage extends BasePage {
         // Смена темы происходит через React state и применяется не синхронно с click(),
         // поэтому дожидаемся фактической смены подписи кнопки, прежде чем читать стили.
         wait.until(d -> !previousLabel.equals(themeToggleButton.getAttribute("aria-label")));
+        waitForStableBackgroundColor();
+    }
+
+    @Step("Дождаться стабилизации цвета фона (завершения CSS-transition)")
+    public void waitForStableBackgroundColor() {
+        // Цвет фона анимируется CSS-transition, поэтому чтение сразу после клика может
+        // поймать промежуточное значение. Дожидаемся, пока два чтения подряд с паузой
+        // совпадут — значит, переход завершился и цвет стабилен. Сама transition
+        // длится 150ms (см. CSS body { transition: background-color 0.15s }), поэтому
+        // пауза между чтениями взята с запасом (400ms), чтобы не словить два чтения
+        // по разные стороны переходного состояния как ложно «стабильные».
+        wait.until(d -> {
+            String first = getBodyBackgroundColor();
+            try {
+                Thread.sleep(400);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            return first.equals(getBodyBackgroundColor());
+        });
     }
 
     @Step("Получить подпись кнопки переключения темы")
@@ -256,15 +276,13 @@ public class VaccinationPage extends BasePage {
 
     @Step("Получить цвет фона страницы")
     public String getBodyBackgroundColor() {
+        // getComputedStyle().backgroundColor сериализуется по-разному в зависимости
+        // от сборки браузера/ОС: "rgb(240, 253, 250)" на одних, "rgba(240, 253, 250, 1)"
+        // на других (например, Chrome на Linux в CI). Нормализуем до "r,g,b", отбросив
+        // альфа-канал, чтобы сравнение цветов не зависело от формата сериализации.
         return (String) ((JavascriptExecutor) driver).executeScript(
-                "return getComputedStyle(document.body).backgroundColor;");
-    }
-
-    @Step("Дождаться, пока цвет фона страницы станет равен {expectedColor}")
-    public void waitForBackgroundColor(String expectedColor) {
-        // Смена темы анимируется CSS-transition по alpha-каналу, поэтому сразу
-        // после клика цвет ещё может отличаться от конечного — дожидаемся, пока
-        // переход завершится и итоговый цвет совпадёт с ожидаемым.
-        wait.until(d -> expectedColor.equals(getBodyBackgroundColor()));
+                "const c = getComputedStyle(document.body).backgroundColor;" +
+                        "const m = c.match(/\\d+/g);" +
+                        "return m ? m.slice(0, 3).join(',') : c;");
     }
 }
