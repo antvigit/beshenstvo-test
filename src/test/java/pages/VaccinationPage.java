@@ -42,6 +42,15 @@ public class VaccinationPage extends BasePage {
     @FindBy(css = "button[type='submit']")
     private WebElement submitButton;
 
+    @FindBy(xpath = "//label[contains(., 'Указать законного представителя')]//input[@type='checkbox']")
+    private WebElement legalRepresentativeCheckbox;
+
+    @FindBy(name = "parent")
+    private WebElement representativeFioField;
+
+    @FindBy(xpath = "//button[contains(@aria-label, 'тёмную тему') or contains(@aria-label, 'светлую тему')]")
+    private WebElement themeToggleButton;
+
     public VaccinationPage(WebDriver driver) {
         super(driver);
         PageFactory.initElements(driver, this);
@@ -206,5 +215,56 @@ public class VaccinationPage extends BasePage {
     @Step("Получить сегодняшнюю дату в формате ДД.ММ.ГГГГ")
     public String getTodayDate() {
         return LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+    }
+
+    @Step("Переключить чекбокс 'Указать законного представителя'")
+    public void toggleLegalRepresentative() {
+        // Нативный input чекбокса в MUI визуально скрыт (opacity: 0) под SVG-иконкой,
+        // поэтому isDisplayed()/elementToBeClickable() для него никогда не станут true —
+        // кликаем через JS, дождавшись только присутствия элемента в DOM.
+        wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.xpath("//label[contains(., 'Указать законного представителя')]//input[@type='checkbox']")));
+        ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", legalRepresentativeCheckbox);
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", legalRepresentativeCheckbox);
+    }
+
+    @Step("Проверить, что поля законного представителя отображаются")
+    public boolean isRepresentativeFioFieldVisible() {
+        List<WebElement> fields = driver.findElements(By.name("parent"));
+        return !fields.isEmpty() && fields.get(0).isDisplayed();
+    }
+
+    @Step("Ввести ФИО законного представителя: {fio}")
+    public void enterRepresentativeFio(String fio) {
+        enterText(representativeFioField, fio);
+    }
+
+    @Step("Переключить тему оформления")
+    public void toggleTheme() {
+        wait.until(ExpectedConditions.elementToBeClickable(themeToggleButton));
+        String previousLabel = themeToggleButton.getAttribute("aria-label");
+        themeToggleButton.click();
+        // Смена темы происходит через React state и применяется не синхронно с click(),
+        // поэтому дожидаемся фактической смены подписи кнопки, прежде чем читать стили.
+        wait.until(d -> !previousLabel.equals(themeToggleButton.getAttribute("aria-label")));
+    }
+
+    @Step("Получить подпись кнопки переключения темы")
+    public String getThemeToggleLabel() {
+        return themeToggleButton.getAttribute("aria-label");
+    }
+
+    @Step("Получить цвет фона страницы")
+    public String getBodyBackgroundColor() {
+        return (String) ((JavascriptExecutor) driver).executeScript(
+                "return getComputedStyle(document.body).backgroundColor;");
+    }
+
+    @Step("Дождаться, пока цвет фона страницы станет равен {expectedColor}")
+    public void waitForBackgroundColor(String expectedColor) {
+        // Смена темы анимируется CSS-transition по alpha-каналу, поэтому сразу
+        // после клика цвет ещё может отличаться от конечного — дожидаемся, пока
+        // переход завершится и итоговый цвет совпадёт с ожидаемым.
+        wait.until(d -> expectedColor.equals(getBodyBackgroundColor()));
     }
 }

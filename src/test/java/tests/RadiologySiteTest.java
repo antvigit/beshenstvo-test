@@ -1,0 +1,63 @@
+package tests;
+
+import io.github.bonigarcia.wdm.WebDriverManager;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Severity;
+import io.qameta.allure.SeverityLevel;
+import io.qameta.allure.Story;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
+import pages.RadiologyPage;
+
+import java.time.Duration;
+
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@Feature("Рентгенология (rad.beshenstvo.pro)")
+public class RadiologySiteTest {
+
+    private WebDriver driver;
+    private RadiologyPage page;
+
+    @BeforeEach
+    void setUp() {
+        boolean headless = Boolean.parseBoolean(System.getProperty("headless", "true"));
+        WebDriverManager.chromedriver().setup();
+        ChromeOptions options = new ChromeOptions();
+        if (headless) {
+            options.addArguments("--headless=new");
+        }
+        options.addArguments("--window-size=1920,1080");
+        driver = new ChromeDriver(options);
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
+        if (!headless) {
+            driver.manage().window().maximize();
+        }
+        page = new RadiologyPage(driver);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (driver != null) driver.quit();
+    }
+
+    // Поддомен рентгенологии — отдельное развёртывание от основного сайта,
+    // поэтому его доступность проверяется отдельным smoke-тестом.
+    @Test
+    @Story("Поддомен рентгенологии открывается и отдаёт непустую страницу")
+    @Severity(SeverityLevel.BLOCKER)
+    void shouldOpenRadiologySubdomain() {
+        page.open();
+        page.waitForPageLoaded();
+
+        assertFalse(page.getTitle() == null || page.getTitle().isBlank(),
+                "У страницы rad.beshenstvo.pro должен быть непустой заголовок");
+        assertTrue(driver.getCurrentUrl().contains("rad.beshenstvo.pro"),
+                "После открытия ссылки «Рентгенология» URL должен указывать на rad.beshenstvo.pro");
+    }
+}

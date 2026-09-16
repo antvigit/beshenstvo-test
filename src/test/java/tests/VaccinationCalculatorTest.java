@@ -189,6 +189,101 @@ public class VaccinationCalculatorTest {
         assertTrue(page.isPdfOpenedInNewTab(), "PDF не открылся в новой вкладке");
     }
 
+    // ===== ТЕСТ 3: ЗАКОННЫЙ ПРЕДСТАВИТЕЛЬ =====
+    @Test
+    @Story("Отображение полей законного представителя")
+    @Severity(SeverityLevel.NORMAL)
+    void shouldShowRepresentativeFieldsWhenCheckboxEnabled() {
+        page.open();
+        page.waitForPageLoaded();
+
+        assertFalse(page.isRepresentativeFioFieldVisible(), "Поле представителя не должно отображаться до включения чекбокса");
+
+        page.toggleLegalRepresentative();
+
+        assertTrue(page.isRepresentativeFioFieldVisible(), "Поле ФИО представителя должно появиться после включения чекбокса");
+        page.enterRepresentativeFio("Иванова Мария Сергеевна");
+    }
+
+    // ===== ТЕСТ 4: ОБЯЗАТЕЛЬНЫ ТОЛЬКО ПОЛЯ, ПОМЕЧЕННЫЕ * (ДАТЫ) =====
+    @Test
+    @Story("Единственно обязательные поля формы — даты, помеченные *")
+    @Severity(SeverityLevel.CRITICAL)
+    void shouldGeneratePdfWithOnlyRequiredDateFields() {
+        page.open();
+        page.waitForPageLoaded();
+
+        // На форме звёздочкой (*) помечены только «Дата обращения» и «Дата начала
+        // вакцинации» — они подставляются по умолчанию текущей датой. ФИО и дата
+        // рождения пациента звёздочкой не отмечены, то есть формально не обязательны:
+        // план должен сформироваться и без них.
+        page.submitForm();
+
+        assertTrue(page.isPdfOpenedInNewTab(),
+                "PDF должен формироваться при заполненных обязательных полях (датах), даже если ФИО и дата рождения пусты");
+    }
+
+    // ===== ТЕСТ 5: ПЕРЕКЛЮЧЕНИЕ ТЁМНОЙ ТЕМЫ =====
+    @Test
+    @Story("Переключение тёмной темы")
+    @Severity(SeverityLevel.MINOR)
+    void shouldToggleDarkTheme() {
+        page.open();
+        page.waitForPageLoaded();
+
+        String lightBackground = page.getBodyBackgroundColor();
+        String lightLabel = page.getThemeToggleLabel();
+
+        page.toggleTheme();
+
+        String darkBackground = page.getBodyBackgroundColor();
+        String darkLabel = page.getThemeToggleLabel();
+
+        assertNotEquals(lightBackground, darkBackground, "Цвет фона должен измениться при включении тёмной темы");
+        assertNotEquals(lightLabel, darkLabel, "Подпись кнопки переключения темы должна измениться");
+
+        page.toggleTheme();
+        page.waitForBackgroundColor(lightBackground);
+        assertEquals(lightBackground, page.getBodyBackgroundColor(), "Цвет фона должен вернуться к исходному");
+    }
+
+    // ===== ТЕСТ 6: ХРОНОЛОГИЧЕСКИЙ ПОРЯДОК И ИНТЕРВАЛЫ ДАТ ДЛЯ РАЗНЫХ ДАТ НАЧАЛА =====
+    @Test
+    @Story("Интервалы графика вакцинации при смещении даты начала")
+    @Severity(SeverityLevel.CRITICAL)
+    void shouldKeepVaccinationIntervalsForCustomStartDate() {
+        page.open();
+        page.waitForPageLoaded();
+
+        String today = page.getTodayDate();
+        page.enterDateByIndex(2, today);
+        page.enterDateByIndex(3, today);
+
+        List<WebElement> dateElements = page.getDateElements();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+
+        LocalDate startDate = LocalDate.parse(today, formatter);
+        int[] expectedOffsets = {0, 3, 7, 14, 30, 90};
+        int found = 0;
+
+        for (int i = 0; i < dateElements.size() && found < expectedOffsets.length; i++) {
+            String fullText = dateElements.get(i).getText().trim();
+            if (fullText.isEmpty()) continue;
+            String datePart = fullText.split(",")[0].trim();
+            try {
+                LocalDate parsedDate = LocalDate.parse(datePart, formatter);
+                LocalDate expectedDate = startDate.plusDays(expectedOffsets[found]);
+                assertEquals(expectedDate, parsedDate,
+                        "Дата дозы №" + (found + 1) + " не соответствует ожидаемому интервалу от даты начала вакцинации");
+                found++;
+            } catch (DateTimeParseException ignored) {
+                // Пропускаем элементы, не являющиеся датами
+            }
+        }
+
+        assertEquals(expectedOffsets.length, found, "Не все 6 доз графика вакцинации были найдены на странице");
+    }
+
     @AfterEach
     void tearDown() {
         if (driver != null) driver.quit();
