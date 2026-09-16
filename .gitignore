@@ -17,3 +17,4 @@ allure-results/
 .DS_Store
 Thumbs.dbafter_submit.png
 __pycache__/
+.pytest_cache/

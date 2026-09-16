@@ -4,6 +4,16 @@
 
 # Changelog
 
+## [v3.2] — 2026-09-16
+### Добавлено
+- **Юнит-тесты Telegram-бота**: `bot/test_bot.py` (pytest) покрывает построение
+  inline-клавиатуры `/run`, корректность `test_class` в payload workflow_dispatch
+  для каждого раздела, поведение при неизвестном callback'е, обработку ошибки
+  GitHub API и `/health`-эндпоинт. Telegram/GitHub API замоканы — реальные секреты
+  не нужны.
+- **`test-bot.yml`**: отдельный workflow, запускающий `pytest bot/test_bot.py`
+  при пуше/PR с изменениями в `bot/**`.
+
 ## [v3.1] — 2026-09-16
 ### Добавлено
 - **Выбор раздела для тестирования в Telegram-боте**: `/run` теперь показывает inline-меню

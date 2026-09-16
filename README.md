@@ -99,6 +99,18 @@ mvn clean test
     `test_class` (имя JUnit-класса или `all`), который run-tests.yml подставляет
     в `mvn test -Dtest=...`.
 
+### 🧪 Тесты самого бота
+
+Логика `bot.py` (выбор раздела, запрос к GitHub Actions API, обработка ошибок)
+покрыта юнит-тестами `bot/test_bot.py` (pytest, Telegram/GitHub API замоканы).
+Запускаются автоматически в `.github/workflows/test-bot.yml` при изменениях
+в `bot/**`, локально:
+
+```bash
+pip install -r bot/requirements.txt -r bot/requirements-test.txt
+pytest bot/test_bot.py -v
+```
+
 Что приходит:
 
     Статус запуска (🔄)
