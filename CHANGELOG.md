@@ -4,6 +4,16 @@
 
 # Changelog
 
+## [v3.1] — 2026-09-16
+### Добавлено
+- **Выбор раздела для тестирования в Telegram-боте**: `/run` теперь показывает inline-меню
+  (🌐 Все разделы / 💉 Вакцинация / 🦴 Ревматология / 🩻 Рентгенология) вместо немедленного
+  запуска всех тестов.
+- **Input `test_class` в `run-tests.yml`**: workflow_dispatch принимает имя JUnit-класса
+  (`VaccinationCalculatorTest`, `RheumatologyCalculatorTest`, `RadiologySiteTest`) или `all`
+  и подставляет его в `mvn test -Dtest=...`; статусные сообщения в Telegram показывают,
+  какой раздел выполняется.
+
 ## [v3.0] — 2026-09-16
 ### Добавлено
 - **Покрытие раздела «Ревматология»**: новый `RheumatologyPage` (POM) и

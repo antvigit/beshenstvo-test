@@ -1,4 +1,5 @@
 import telebot
+from telebot import types
 import requests
 import os
 import time
@@ -9,6 +10,15 @@ GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
 REPO_OWNER = 'antvigit'
 REPO_NAME = 'beshenstvo-test'
 WORKFLOW_ID = 'run-tests.yml'
+
+# Разделы сайта, доступные для выбора в /run: ключ callback-данных -> (подпись
+# кнопки, имя JUnit-класса для input'а test_class воркфлоу run-tests.yml).
+TEST_SECTIONS = {
+    'all': ('🌐 Все разделы', 'all'),
+    'vaccination': ('💉 Вакцинация', 'VaccinationCalculatorTest'),
+    'rheumatology': ('🦴 Ревматология', 'RheumatologyCalculatorTest'),
+    'radiology': ('🩻 Рентгенология', 'RadiologySiteTest'),
+}
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -58,15 +68,35 @@ def delete_progress(chat_id, message_id):
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     name = message.from_user.first_name
-    bot.reply_to(message, f"Привет, {name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы запустить тесты.")
+    bot.reply_to(message, f"Привет, {name}! 👋\nЯ бот для запуска автотестов.\nНапиши /run, чтобы выбрать раздел сайта и запустить тесты.")
 
 @bot.message_handler(commands=['run'])
 def run_tests(message):
-    name = message.from_user.first_name
-    chat_id = message.chat.id
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for key, (label, _) in TEST_SECTIONS.items():
+        markup.add(types.InlineKeyboardButton(label, callback_data=f"run:{key}"))
+    bot.reply_to(message, "Какой раздел сайта протестировать?", reply_markup=markup)
 
-    progress_msg = bot.reply_to(message, "⏳ Подготовка к запуску... (примерное время ожидания: до 5 минут)")
-    update_progress(chat_id, progress_msg.message_id, 0, "⏳ Подготовка к запуску...")
+@bot.callback_query_handler(func=lambda call: call.data.startswith('run:'))
+def handle_run_section(call):
+    key = call.data.split(':', 1)[1]
+    section = TEST_SECTIONS.get(key)
+    if section is None:
+        bot.answer_callback_query(call.id, "Неизвестный раздел, попробуйте /run ещё раз")
+        return
+
+    label, test_class = section
+    name = call.from_user.first_name
+    chat_id = call.message.chat.id
+
+    bot.answer_callback_query(call.id, f"Запускаю: {label}")
+    try:
+        bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
+    except Exception as e:
+        print(f"⚠️ Could not clear keyboard: {e}")
+
+    progress_msg = bot.send_message(chat_id, f"⏳ Подготовка к запуску ({label})... (примерное время ожидания: до 5 минут)")
+    update_progress(chat_id, progress_msg.message_id, 0, f"⏳ Подготовка к запуску ({label})...")
 
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
     headers = {
@@ -76,7 +106,8 @@ def run_tests(message):
     payload = {
         "ref": "master",
         "inputs": {
-            "chat_id": str(chat_id)
+            "chat_id": str(chat_id),
+            "test_class": test_class
         }
     }
     response = requests.post(url, json=payload, headers=headers)
@@ -85,10 +116,10 @@ def run_tests(message):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    update_progress(chat_id, progress_msg.message_id, 10, "🚀 Тесты запущены, ожидание завершения... (примерное время: до 5 минут)")
-    wait_for_result(chat_id, progress_msg.message_id, name)
+    update_progress(chat_id, progress_msg.message_id, 10, f"🚀 Тесты запущены ({label}), ожидание завершения... (примерное время: до 5 минут)")
+    wait_for_result(chat_id, progress_msg.message_id, name, label)
 
-def wait_for_result(chat_id, message_id, name):
+def wait_for_result(chat_id, message_id, name, label="все разделы"):
     total_time = 300  # 5 минут
     start_time = time.time()
     progress = 10
@@ -120,7 +151,7 @@ def wait_for_result(chat_id, message_id, name):
                 delete_progress(chat_id, message_id)
                 bot.send_message(
                     chat_id,
-                    f"✅ Все тесты завершены, {name}!\n"
+                    f"✅ Тесты завершены ({label}), {name}!\n"
                     f"📊 Отчёт: https://github.com/{REPO_OWNER}/{REPO_NAME}/actions\n"
                     f"💡 Можете повторить запрос командой /run"
                 )
@@ -135,7 +166,7 @@ def wait_for_result(chat_id, message_id, name):
             delete_progress(chat_id, message_id)
             bot.send_message(
                 chat_id,
-                f"⏰ {name}, тесты всё ещё выполняются. Проверь результат вручную:\n"
+                f"⏰ {name}, тесты ({label}) всё ещё выполняются. Проверь результат вручную:\n"
                 f"📊 https://github.com/{REPO_OWNER}/{REPO_NAME}/actions"
             )
             return
