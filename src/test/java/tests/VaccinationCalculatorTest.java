@@ -1,6 +1,5 @@
 package tests;
 
-import io.github.bonigarcia.wdm.WebDriverManager;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
@@ -10,17 +9,12 @@ import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.Dimension;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.firefox.FirefoxOptions;
-import org.openqa.selenium.remote.DesiredCapabilities;
-import org.openqa.selenium.remote.RemoteWebDriver;
 import pages.VaccinationPage;
+import support.WebDriverFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -28,7 +22,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -66,45 +59,14 @@ public class VaccinationCalculatorTest {
 
     @BeforeEach
     void setUp() throws MalformedURLException {
-        String browser = System.getenv("browser") != null ? System.getenv("browser")
-                : testProps.getProperty("browser", "chrome");
-        String gridUrl = System.getenv("grid.url");
         boolean headless = Boolean.parseBoolean(System.getProperty("headless", "true"));
-
-        if (gridUrl != null && !gridUrl.isEmpty()) {
-            if (browser.equals("chrome")) {
-                ChromeOptions options = new ChromeOptions();
-                if (headless) {
-                    options.addArguments("--headless=new");
-                }
-                options.addArguments("--window-size=1920,1080");
-                options.addArguments("--no-sandbox");
-                options.addArguments("--disable-dev-shm-usage");
-                options.addArguments("--disable-gpu");
-                options.addArguments("--remote-debugging-port=9222");
-                driver = new RemoteWebDriver(new URL(gridUrl), options);
-            } else if (browser.equals("firefox")) {
-                FirefoxOptions options = new FirefoxOptions();
-                if (headless) {
-                    options.addArguments("--headless");
-                }
-                driver = new RemoteWebDriver(new URL(gridUrl), options);
-            } else {
-                DesiredCapabilities caps = new DesiredCapabilities();
-                caps.setBrowserName(browser);
-                driver = new RemoteWebDriver(new URL(gridUrl), caps);
-            }
-        } else {
-            WebDriverManager.chromedriver().setup();
-            ChromeOptions options = new ChromeOptions();
-            if (headless) {
-                options.addArguments("--headless=new");
-            }
-            options.addArguments("--window-size=1920,1080");
-            driver = new ChromeDriver(options);
+        driver = WebDriverFactory.createDriver();
+        // window().maximize() в headless-режиме на некоторых страницах сайта схлопывает
+        // viewport до мобильного брейкпоинта (см. RheumatologyPage) — WebDriverFactory
+        // уже задаёт нужный --window-size, поэтому maximize нужен только для видимого окна.
+        if (!headless) {
+            driver.manage().window().maximize();
         }
-
-        driver.manage().window().maximize();
         page = new VaccinationPage(driver);
     }
 

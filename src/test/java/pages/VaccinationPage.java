@@ -4,8 +4,6 @@ import io.qameta.allure.Step;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
@@ -13,11 +11,6 @@ import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -125,54 +118,32 @@ public class VaccinationPage extends BasePage {
 
     @Step("Ввести дату в поле по номеру {index}")
     public void enterDateByIndex(int index, String date) {
+        // Поиск дня по клику в календаре был хрупким (зависел от текущего месяца в
+        // пикере и падал с ElementNotInteractableException на CI из-за анимации
+        // открытия/закрытия попапа). Поле — маскированный инпут ДД.ММ.ГГГГ: после
+        // клика курсор автоматически встаёт на первый сегмент, и мышь-независимый
+        // sendKeys одними цифрами (без точек — маска расставляет их сама) заполняет
+        // его посегментно. Работает как для пустого поля, так и для уже заполненного.
         By fieldLocator = By.xpath("(//input[@placeholder='ДД.ММ.ГГГГ'])[" + index + "]");
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(fieldLocator));
 
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
-        try { Thread.sleep(300); } catch (InterruptedException e) {}
-
+        wait.until(ExpectedConditions.elementToBeClickable(field));
         field.click();
-        try { Thread.sleep(500); } catch (InterruptedException e) {}
-
-        String day = date.split("\\.")[0];
-        By dayLocator = By.xpath("//button[contains(@class, 'MuiPickersDay-root') and text()='" + day + "']");
-        try {
-            WebElement dayButton = wait.until(ExpectedConditions.elementToBeClickable(dayLocator));
-            dayButton.click();
-            try { Thread.sleep(300); } catch (InterruptedException ex) {}
-        } catch (Exception e) {
-            By altLocator = By.xpath("//button[contains(@aria-label, '" + day + ".')]");
-            try {
-                WebElement dayButton = wait.until(ExpectedConditions.elementToBeClickable(altLocator));
-                dayButton.click();
-                try { Thread.sleep(300); } catch (InterruptedException ex) {}
-            } catch (Exception ex) {
-                // fallback – пробуем ввести через sendKeys
-                field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
-                field.sendKeys(Keys.DELETE);
-                for (char ch : date.toCharArray()) {
-                    field.sendKeys(String.valueOf(ch));
-                    try { Thread.sleep(50); } catch (InterruptedException ex2) {}
-                }
-                field.sendKeys(Keys.TAB);
-            }
-        }
+        field.sendKeys(Keys.HOME);
+        field.sendKeys(date.replace(".", ""));
         field.sendKeys(Keys.ESCAPE);
-        try { Thread.sleep(300); } catch (InterruptedException e) {}
 
-        // Проверка и скриншот при ошибке (только для даты рождения)
-        if (index == 1) {
-            String currentValue = field.getAttribute("value");
-            if (!date.equals(currentValue)) {
-                System.out.println("⚠️ Дата рождения не установилась: " + currentValue);
-                try {
-                    File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-                    Files.copy(screenshot.toPath(), Paths.get("birth_date_failed.png"), StandardCopyOption.REPLACE_EXISTING);
-                    System.out.println("📸 Скриншот сохранён: birth_date_failed.png");
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }
-            }
+        String currentValue = field.getAttribute("value");
+        if (!date.equals(currentValue)) {
+            ((JavascriptExecutor) driver).executeScript(
+                    "const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;" +
+                            "setter.call(arguments[0], arguments[1]);" +
+                            "arguments[0].dispatchEvent(new Event('input', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('change', { bubbles: true }));" +
+                            "arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));",
+                    field, date
+            );
         }
     }
 
@@ -243,23 +214,31 @@ public class VaccinationPage extends BasePage {
     public void toggleTheme() {
         wait.until(ExpectedConditions.elementToBeClickable(themeToggleButton));
         String previousLabel = themeToggleButton.getAttribute("aria-label");
+        String previousBackground = getBodyBackgroundColor();
         themeToggleButton.click();
         // Смена темы происходит через React state и применяется не синхронно с click(),
         // поэтому дожидаемся фактической смены подписи кнопки, прежде чем читать стили.
         wait.until(d -> !previousLabel.equals(themeToggleButton.getAttribute("aria-label")));
-        waitForStableBackgroundColor();
+        waitForColorChangeAndStabilize(previousBackground);
     }
 
-    @Step("Дождаться стабилизации цвета фона (завершения CSS-transition)")
+    @Step("Дождаться стабилизации цвета фона страницы (после загрузки, до любых переключений)")
     public void waitForStableBackgroundColor() {
-        // Цвет фона анимируется CSS-transition, поэтому чтение сразу после клика может
-        // поймать промежуточное значение. Дожидаемся, пока два чтения подряд с паузой
-        // совпадут — значит, переход завершился и цвет стабилен. Сама transition
-        // длится 150ms (см. CSS body { transition: background-color 0.15s }), поэтому
-        // пауза между чтениями взята с запасом (400ms), чтобы не словить два чтения
-        // по разные стороны переходного состояния как ложно «стабильные».
+        waitForColorChangeAndStabilize(null);
+    }
+
+    private void waitForColorChangeAndStabilize(String previousColor) {
+        // Цвет фона анимируется CSS-transition (150ms, см. CSS body { transition:
+        // background-color 0.15s }), поэтому чтение сразу после клика может поймать
+        // промежуточное значение. Требуем ОБА условия: цвет уже отличается от того,
+        // что было до клика (страхует от ложного «стабильно», пойманного ДО начала
+        // перехода — под нагрузкой JS может выполниться с задержкой больше паузы между
+        // чтениями), и два чтения подряд совпадают (сам переход завершился).
         wait.until(d -> {
             String first = getBodyBackgroundColor();
+            if (previousColor != null && previousColor.equals(first)) {
+                return false;
+            }
             try {
                 Thread.sleep(400);
             } catch (InterruptedException ignored) {

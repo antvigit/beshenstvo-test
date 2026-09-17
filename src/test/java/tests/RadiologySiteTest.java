@@ -1,6 +1,5 @@
 package tests;
 
-import io.github.bonigarcia.wdm.WebDriverManager;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
@@ -9,10 +8,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
 import pages.RadiologyPage;
+import support.WebDriverFactory;
 
+import java.net.MalformedURLException;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,15 +24,9 @@ public class RadiologySiteTest {
     private RadiologyPage page;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws MalformedURLException {
         boolean headless = Boolean.parseBoolean(System.getProperty("headless", "true"));
-        WebDriverManager.chromedriver().setup();
-        ChromeOptions options = new ChromeOptions();
-        if (headless) {
-            options.addArguments("--headless=new");
-        }
-        options.addArguments("--window-size=1920,1080");
-        driver = new ChromeDriver(options);
+        driver = WebDriverFactory.createDriver();
         driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(30));
         if (!headless) {
             driver.manage().window().maximize();

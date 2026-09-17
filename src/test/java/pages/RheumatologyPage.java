@@ -69,7 +69,10 @@ public class RheumatologyPage extends BasePage {
         WebElement field = wait.until(ExpectedConditions.visibilityOfElementLocated(numberFieldLocator(labelText)));
         ((JavascriptExecutor) driver).executeScript("arguments[0].scrollIntoView({block: 'center'});", field);
         wait.until(ExpectedConditions.elementToBeClickable(field));
-        field.click();
+        // Обычный клик иногда попадает в плавающий MUI-лейбл поля (ещё не успел
+        // анимированно сместиться после появления формы) — ElementClickIntercepted.
+        // JS-клик и фокус берут элемент напрямую, минуя геометрический hit-test.
+        ((JavascriptExecutor) driver).executeScript("arguments[0].focus(); arguments[0].click();", field);
         field.sendKeys(Keys.chord(Keys.CONTROL, "a"));
         field.sendKeys(Keys.DELETE);
         field.sendKeys(value);

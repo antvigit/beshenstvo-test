@@ -1,6 +1,5 @@
 package tests;
 
-import io.github.bonigarcia.wdm.WebDriverManager;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Severity;
 import io.qameta.allure.SeverityLevel;
@@ -10,12 +9,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import pages.RheumatologyPage;
+import support.WebDriverFactory;
 
+import java.net.MalformedURLException;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,19 +26,13 @@ public class RheumatologyCalculatorTest {
     private RheumatologyPage page;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws MalformedURLException {
         boolean headless = Boolean.parseBoolean(System.getProperty("headless", "true"));
-        WebDriverManager.chromedriver().setup();
-        ChromeOptions options = new ChromeOptions();
-        if (headless) {
-            options.addArguments("--headless=new");
-        }
-        options.addArguments("--window-size=1920,1080");
-        driver = new ChromeDriver(options);
+        driver = WebDriverFactory.createDriver();
         // window().maximize() in headless mode shrinks the viewport to a small
         // screen size on this host, which flips the site into its mobile layout
-        // (the MuiTabs bar is replaced entirely) — --window-size already sets
-        // the size we want, so only maximize for a real, visible browser window.
+        // (the MuiTabs bar is replaced entirely) — WebDriverFactory already sets
+        // the window size we want, so only maximize for a real, visible browser window.
         if (!headless) {
             driver.manage().window().maximize();
         }
