@@ -94,10 +94,12 @@ mvn clean test
     /start — приветствие.
 
     /run — показать меню выбора раздела сайта (🌐 Все разделы / 💉 Вакцинация /
-    🦴 Ревматология / 🩻 Рентгенология) и запустить тесты выбранного раздела
-    в Chrome и Firefox. Выбор раздела передаётся в workflow_dispatch input
-    `test_class` (имя JUnit-класса или `all`), который run-tests.yml подставляет
-    в `mvn test -Dtest=...`.
+    🦴 Ревматология / 🩻 Рентгенология), затем меню выбора браузера
+    (🌐 Chrome + Firefox / 🖥 Только Chrome / 🦊 Только Firefox) и запустить
+    тесты. Выбор передаётся в workflow_dispatch inputs `test_class` (имя
+    JUnit-класса или `all`) и `browser` (`chrome`/`firefox`/`all`) —
+    run-tests.yml подставляет `test_class` в `mvn test -Dtest=...`, а `browser`
+    определяет матрицу job'ов (один браузер вместо обоих).
 
 ### 🧪 Тесты самого бота
 

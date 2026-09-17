@@ -17,17 +17,41 @@ on:
           - VaccinationCalculatorTest
           - RheumatologyCalculatorTest
           - RadiologySiteTest
+      browser:
+        description: 'Браузер(ы) для запуска'
+        required: false
+        type: choice
+        default: 'all'
+        options:
+          - all
+          - chrome
+          - firefox
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      browsers: ${{ steps.set.outputs.browsers }}
+    steps:
+      - name: Resolve browser matrix from input
+        id: set
+        run: |
+          case "${{ github.event.inputs.browser }}" in
+            chrome) echo 'browsers=["chrome"]' >> "$GITHUB_OUTPUT" ;;
+            firefox) echo 'browsers=["firefox"]' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'browsers=["chrome","firefox"]' >> "$GITHUB_OUTPUT" ;;
+          esac
+
   test:
+    needs: setup
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       matrix:
-        browser: [chrome, firefox]
+        browser: ${{ fromJson(needs.setup.outputs.browsers) }}
 
     steps:
       - name: Checkout code

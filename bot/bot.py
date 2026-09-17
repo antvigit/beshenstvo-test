@@ -20,6 +20,14 @@ TEST_SECTIONS = {
     'radiology': ('🩻 Рентгенология', 'RadiologySiteTest'),
 }
 
+# Браузеры, доступные для выбора на втором шаге /run: ключ callback-данных ->
+# (подпись кнопки, значение input'а browser воркфлоу run-tests.yml).
+TEST_BROWSERS = {
+    'both': ('🌐 Chrome + Firefox', 'all'),
+    'chrome': ('🖥 Только Chrome', 'chrome'),
+    'firefox': ('🦊 Только Firefox', 'firefox'),
+}
+
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
@@ -85,18 +93,47 @@ def handle_run_section(call):
         bot.answer_callback_query(call.id, "Неизвестный раздел, попробуйте /run ещё раз")
         return
 
+    label, _ = section
+    chat_id = call.message.chat.id
+
+    bot.answer_callback_query(call.id, f"Раздел: {label}")
+
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    for bkey, (blabel, _) in TEST_BROWSERS.items():
+        markup.add(types.InlineKeyboardButton(blabel, callback_data=f"browser:{key}:{bkey}"))
+    try:
+        bot.edit_message_text(
+            f"Раздел: {label}\nВ каком браузере запустить?",
+            chat_id, call.message.message_id,
+            reply_markup=markup
+        )
+    except Exception as e:
+        print(f"⚠️ Could not show browser choice: {e}")
+        bot.send_message(chat_id, f"Раздел: {label}\nВ каком браузере запустить?", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('browser:'))
+def handle_browser_choice(call):
+    _, section_key, browser_key = call.data.split(':', 2)
+    section = TEST_SECTIONS.get(section_key)
+    browser_choice = TEST_BROWSERS.get(browser_key)
+    if section is None or browser_choice is None:
+        bot.answer_callback_query(call.id, "Что-то пошло не так, попробуйте /run ещё раз")
+        return
+
     label, test_class = section
+    browser_label, browser_value = browser_choice
+    full_label = f"{label}, {browser_label}"
     name = call.from_user.first_name
     chat_id = call.message.chat.id
 
-    bot.answer_callback_query(call.id, f"Запускаю: {label}")
+    bot.answer_callback_query(call.id, f"Запускаю: {full_label}")
     try:
         bot.edit_message_reply_markup(chat_id, call.message.message_id, reply_markup=None)
     except Exception as e:
         print(f"⚠️ Could not clear keyboard: {e}")
 
-    progress_msg = bot.send_message(chat_id, f"⏳ Подготовка к запуску ({label})... (примерное время ожидания: до 5 минут)")
-    update_progress(chat_id, progress_msg.message_id, 0, f"⏳ Подготовка к запуску ({label})...")
+    progress_msg = bot.send_message(chat_id, f"⏳ Подготовка к запуску ({full_label})... (примерное время ожидания: до 5 минут)")
+    update_progress(chat_id, progress_msg.message_id, 0, f"⏳ Подготовка к запуску ({full_label})...")
 
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/actions/workflows/{WORKFLOW_ID}/dispatches"
     headers = {
@@ -107,7 +144,8 @@ def handle_run_section(call):
         "ref": "master",
         "inputs": {
             "chat_id": str(chat_id),
-            "test_class": test_class
+            "test_class": test_class,
+            "browser": browser_value
         }
     }
     response = requests.post(url, json=payload, headers=headers)
@@ -116,8 +154,8 @@ def handle_run_section(call):
         update_progress(chat_id, progress_msg.message_id, 100, f"❌ Ошибка при запуске: {response.status_code}")
         return
 
-    update_progress(chat_id, progress_msg.message_id, 10, f"🚀 Тесты запущены ({label}), ожидание завершения... (примерное время: до 5 минут)")
-    wait_for_result(chat_id, progress_msg.message_id, name, label)
+    update_progress(chat_id, progress_msg.message_id, 10, f"🚀 Тесты запущены ({full_label}), ожидание завершения... (примерное время: до 5 минут)")
+    wait_for_result(chat_id, progress_msg.message_id, name, full_label)
 
 def wait_for_result(chat_id, message_id, name, label="все разделы"):
     total_time = 300  # 5 минут

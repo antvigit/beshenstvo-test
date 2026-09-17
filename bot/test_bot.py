@@ -68,20 +68,47 @@ def test_run_command_builds_keyboard_with_all_sections():
     assert {b.callback_data for b in buttons} == {f"run:{k}" for k in bot_module.TEST_SECTIONS}
 
 
-@pytest.mark.parametrize("callback_data,expected_class", [
-    ("run:all", "all"),
-    ("run:vaccination", "VaccinationCalculatorTest"),
-    ("run:rheumatology", "RheumatologyCalculatorTest"),
-    ("run:radiology", "RadiologySiteTest"),
+@pytest.mark.parametrize("section_key", list(bot_module.TEST_SECTIONS))
+def test_section_choice_shows_browser_menu(section_key):
+    call = fake_call(f"run:{section_key}", chat_id=333444)
+    bot_module.handle_run_section(call)
+
+    edit_call = bot_module.bot.edit_message_text.call_args
+    markup = edit_call.kwargs.get("reply_markup")
+    buttons = [btn for row in markup.keyboard for btn in row]
+
+    assert len(buttons) == len(bot_module.TEST_BROWSERS)
+    assert {b.callback_data for b in buttons} == {
+        f"browser:{section_key}:{bkey}" for bkey in bot_module.TEST_BROWSERS
+    }
+    # requests.post не вызывается на этом шаге - только показывается меню браузера
+    assert bot_module.bot.send_message.call_count == 0
+
+
+def test_unknown_section_does_not_crash_or_show_browser_menu():
+    call = fake_call("run:does-not-exist")
+    bot_module.handle_run_section(call)  # не должно кинуть исключение
+
+    assert bot_module.bot.edit_message_text.call_count == 0
+    assert bot_module.bot.answer_callback_query.call_count >= 1
+
+
+@pytest.mark.parametrize("callback_data,expected_class,expected_browser", [
+    ("browser:all:both", "all", "all"),
+    ("browser:vaccination:chrome", "VaccinationCalculatorTest", "chrome"),
+    ("browser:rheumatology:firefox", "RheumatologyCalculatorTest", "firefox"),
+    ("browser:radiology:both", "RadiologySiteTest", "all"),
 ])
-def test_section_dispatches_correct_test_class(monkeypatch, callback_data, expected_class):
+def test_browser_choice_dispatches_correct_test_class_and_browser(
+    monkeypatch, callback_data, expected_class, expected_browser
+):
     mock_post = MagicMock(return_value=types.SimpleNamespace(status_code=204))
     mock_wait = MagicMock()
     monkeypatch.setattr(bot_module.requests, "post", mock_post)
     monkeypatch.setattr(bot_module, "wait_for_result", mock_wait)
 
     call = fake_call(callback_data, chat_id=111222)
-    bot_module.handle_run_section(call)
+    bot_module.handle_browser_choice(call)
 
     assert mock_post.call_count == 1
     args, kwargs = mock_post.call_args
@@ -94,19 +121,18 @@ def test_section_dispatches_correct_test_class(monkeypatch, callback_data, expec
     )
     assert payload["ref"] == "master"
     assert payload["inputs"]["test_class"] == expected_class
+    assert payload["inputs"]["browser"] == expected_browser
     assert payload["inputs"]["chat_id"] == str(call.message.chat.id)
 
     assert mock_wait.call_count == 1
-    expected_label = bot_module.TEST_SECTIONS[callback_data.split(":", 1)[1]][0]
-    assert mock_wait.call_args.args[-1] == expected_label
 
 
-def test_unknown_section_does_not_crash_or_trigger_workflow(monkeypatch):
+def test_unknown_browser_choice_does_not_crash_or_trigger_workflow(monkeypatch):
     mock_post = MagicMock()
     monkeypatch.setattr(bot_module.requests, "post", mock_post)
 
-    call = fake_call("run:does-not-exist")
-    bot_module.handle_run_section(call)  # не должно кинуть исключение
+    call = fake_call("browser:vaccination:does-not-exist")
+    bot_module.handle_browser_choice(call)  # не должно кинуть исключение
 
     assert mock_post.call_count == 0
     assert bot_module.bot.answer_callback_query.call_count >= 1
@@ -118,8 +144,8 @@ def test_github_api_error_does_not_start_waiting(monkeypatch):
     monkeypatch.setattr(bot_module.requests, "post", mock_post)
     monkeypatch.setattr(bot_module, "wait_for_result", mock_wait)
 
-    call = fake_call("run:vaccination")
-    bot_module.handle_run_section(call)
+    call = fake_call("browser:vaccination:chrome")
+    bot_module.handle_browser_choice(call)
 
     assert mock_wait.call_count == 0
 
