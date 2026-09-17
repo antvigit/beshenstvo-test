@@ -62,7 +62,7 @@ jobs:
       - name: Wait for Selenium Grid to be ready
         run: |
           for i in {1..30}; do
-            if curl -s http://localhost:4444/status | grep -q '"ready":true'; then
+            if curl -s http://localhost:4444/status | grep -Eq '"ready":\s*true'; then
               echo "Grid is ready"
               break
             fi
@@ -77,15 +77,33 @@ jobs:
             -d message_id=${{ steps.init_msg.outputs.message_id }} \
             -d "text=🚀 Запускаю тесты (${{ steps.init_msg.outputs.section_label }}) для ${{ matrix.browser }}...%0A⏳ Выполняются тесты..."
 
-      - name: Run tests for ${{ matrix.browser }}
+      - name: Build test image
+        run: docker build -t beshenstvo-tests -f Dockerfile .
+
+      - name: Run tests for ${{ matrix.browser }} (in Docker)
         env:
           TEST_CLASS: ${{ github.event.inputs.test_class }}
         run: |
+          mkdir -p target
           if [ -n "$TEST_CLASS" ] && [ "$TEST_CLASS" != "all" ]; then
-            mvn clean test -Dtest="$TEST_CLASS" -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
+            MVN_ARGS="-Dtest=$TEST_CLASS"
           else
-            mvn clean test -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
+            MVN_ARGS=""
           fi
+          # --network host: контейнер обращается к Selenium Grid на localhost:4444,
+          # запущенном docker compose на самом раннере. Контейнер пишет в volume от
+          # имени root (образ maven:3.8-openjdk-11 не создаёт отдельного пользователя,
+          # а --user ломает поиск ~/.m2 внутри контейнера — Maven резолвит репозиторий
+          # от $HOME, который для произвольного UID не задан). target/ создан заранее
+          # от имени раннера, поэтому последующим шагам (mvn allure:report на хосте)
+          # достаточно читать и дописывать в него новые файлы, не трогая существующие.
+          # "mvn test" вместо "mvn clean test": target/ — смонтированная с хоста
+          # директория, а не файл внутри образа, и "clean" пытается удалить сам
+          # каталог-точку монтирования, а не только его содержимое.
+          docker run --rm --network host \
+            -v "$PWD/target:/app/target" \
+            beshenstvo-tests \
+            mvn test $MVN_ARGS -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
 
       - name: Edit message - tests finished
         run: |

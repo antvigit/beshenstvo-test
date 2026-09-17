@@ -52,6 +52,11 @@ public class RheumatologyPage extends BasePage {
         By optionLocator = By.xpath("//li[@role='option'][contains(., '" + scaleName + "')]");
         WebElement option = wait.until(ExpectedConditions.elementToBeClickable(optionLocator));
         option.click();
+        // Дожидаемся, пока попап меню полностью закроется (анимация закрытия в Firefox
+        // заметно дольше, чем в Chrome) — иначе следующий вызов selectScale в цикле может
+        // кликнуть по комбобоксу, пока ещё видим уходящий MuiPopover поверх него
+        // (ElementClickIntercepted).
+        wait.until(ExpectedConditions.invisibilityOfElementLocated(By.cssSelector(".MuiPopover-root")));
     }
 
     @Step("Получить название текущей выбранной шкалы")

@@ -49,7 +49,11 @@ public final class WebDriverFactory {
             options.addArguments("--no-sandbox");
             options.addArguments("--disable-dev-shm-usage");
             options.addArguments("--disable-gpu");
-            options.addArguments("--remote-debugging-port=9222");
+            // Без фиксированного --remote-debugging-port=9222: с параллельным запуском
+            // методов несколько сессий Chrome могут оказаться на одном grid-узле
+            // (maxSessions: 2 на узел) и конкурировать за один и тот же порт, из-за чего
+            // вторая сессия падает с "unable to connect to renderer". Порт по умолчанию
+            // Selenium выбирает автоматически и свободный для каждой сессии.
             return new RemoteWebDriver(new URL(gridUrl), options);
         }
         if ("firefox".equals(browser)) {
