@@ -98,6 +98,7 @@ def test_unknown_section_does_not_crash_or_show_browser_menu():
     ("browser:vaccination:chrome", "VaccinationCalculatorTest", "chrome"),
     ("browser:rheumatology:firefox", "RheumatologyCalculatorTest", "firefox"),
     ("browser:radiology:both", "RadiologySiteTest", "all"),
+    ("browser:api:chrome", "VaccinationApiTest", "chrome"),
 ])
 def test_browser_choice_dispatches_correct_test_class_and_browser(
     monkeypatch, callback_data, expected_class, expected_browser

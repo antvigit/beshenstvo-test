@@ -18,6 +18,7 @@ TEST_SECTIONS = {
     'vaccination': ('💉 Вакцинация', 'VaccinationCalculatorTest'),
     'rheumatology': ('🦴 Ревматология', 'RheumatologyCalculatorTest'),
     'radiology': ('🩻 Рентгенология', 'RadiologySiteTest'),
+    'api': ('🔌 API вакцинации', 'VaccinationApiTest'),
 }
 
 # Браузеры, доступные для выбора на втором шаге /run: ключ callback-данных ->

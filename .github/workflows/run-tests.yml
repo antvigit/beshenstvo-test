@@ -1,6 +1,15 @@
 name: Run Tests
 
 on:
+  # Плановый ночной прогон — заготовка, сознательно выключена (не расходуем
+  # минуты CI и не шлём уведомления в бот, пока в этом нет реальной нужды).
+  # Чтобы включить: раскомментировать блок ниже и завести секрет
+  # DEFAULT_CHAT_ID (у планового запуска нет "нажавшего кнопку" пользователя,
+  # поэтому chat_id берём из секрета, а не из inputs — см. шаг
+  # "Send initial message"). Время в UTC, '0 2 * * *' = 05:00 по Москве.
+  #
+  # schedule:
+  #   - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       chat_id:
@@ -17,6 +26,7 @@ on:
           - VaccinationCalculatorTest
           - RheumatologyCalculatorTest
           - RadiologySiteTest
+          - VaccinationApiTest
       browser:
         description: 'Браузер(ы) для запуска'
         required: false
