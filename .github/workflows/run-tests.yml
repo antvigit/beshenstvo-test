@@ -94,9 +94,7 @@ jobs:
           # запущенном docker compose на самом раннере. Контейнер пишет в volume от
           # имени root (образ maven:3.8-openjdk-11 не создаёт отдельного пользователя,
           # а --user ломает поиск ~/.m2 внутри контейнера — Maven резолвит репозиторий
-          # от $HOME, который для произвольного UID не задан). target/ создан заранее
-          # от имени раннера, поэтому последующим шагам (mvn allure:report на хосте)
-          # достаточно читать и дописывать в него новые файлы, не трогая существующие.
+          # от $HOME, который для произвольного UID не задан).
           # "mvn test" вместо "mvn clean test": target/ — смонтированная с хоста
           # директория, а не файл внутри образа, и "clean" пытается удалить сам
           # каталог-точку монтирования, а не только его содержимое.
@@ -104,6 +102,14 @@ jobs:
             -v "$PWD/target:/app/target" \
             beshenstvo-tests \
             mvn test $MVN_ARGS -Dbrowser=${{ matrix.browser }} -Dgrid.url=http://localhost:4444/wd/hub || true
+
+          # На нативном Linux (в отличие от Docker Desktop for Mac, где это
+          # транслируется прозрачно) файлы, написанные root'ом в контейнере, реально
+          # становятся root-owned на хосте — следующий шаг (mvn allure:report, уже
+          # без Docker) не может писать executor.json в target/allure-results от имени
+          # обычного пользователя раннера. Возвращаем владение раннеру; sudo здесь
+          # беспарольный на GitHub-hosted раннерах.
+          sudo chown -R "$(id -u):$(id -g)" target
 
       - name: Edit message - tests finished
         run: |
