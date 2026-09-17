@@ -164,6 +164,93 @@ public class RheumatologyCalculatorTest {
         }
     }
 
+    @Test
+    @Story("ASDAS-ESR: расчёт по формуле 0.079*BP+0.069*MS+0.113*PGA+0.086*PP+0.293*sqrt(СОЭ)")
+    @Severity(SeverityLevel.CRITICAL)
+    void shouldCalculateAsdasEsr() {
+        page.switchTab("Бол. Бехтерева");
+        assertTrue(page.getSelectedScale().contains("BASDAI"), "По умолчанию должна быть выбрана шкала BASDAI");
+        page.selectScale("ASDAS-ESR");
+
+        int backPain = 6, stiffness = 4, patientGlobal = 7, peripheral = 3, esr = 25;
+        page.setSlider("Боль в спине", backPain);
+        page.setSlider("Продолжительность утренней скованности", stiffness);
+        page.setSlider("Общая оценка активности заболевания пациентом", patientGlobal);
+        page.setSlider("Боль/припухлость периферических суставов", peripheral);
+        page.fillNumberField("СОЭ", String.valueOf(esr));
+        page.clickCalculate();
+
+        // Коэффициенты — полная точность (0.079/0.069/0.113/0.086/0.293), а не
+        // округлённые до сотых значения из популярных памяток по ASDAS: на
+        // округлённых коэффициентах результат расходится с сайтом на ~0.01-0.03.
+        double expected = 0.079 * backPain + 0.069 * stiffness + 0.113 * patientGlobal
+                + 0.086 * peripheral + 0.293 * Math.sqrt(esr);
+        assertEquals(expected, parseResultValue(), 0.01, "ASDAS-ESR рассчитан неверно");
+    }
+
+    @Test
+    @Story("ASDAS-CRP: расчёт по формуле 0.121*BP+0.058*MS+0.110*PGA+0.073*PP+0.579*ln(СРБ+1)")
+    @Severity(SeverityLevel.CRITICAL)
+    void shouldCalculateAsdasCrp() {
+        page.switchTab("Бол. Бехтерева");
+        page.selectScale("ASDAS-CRP");
+
+        int backPain = 8, stiffness = 2, patientGlobal = 6, peripheral = 4, crp = 15;
+        page.setSlider("Боль в спине", backPain);
+        page.setSlider("Продолжительность утренней скованности", stiffness);
+        page.setSlider("Общая оценка активности заболевания пациентом", patientGlobal);
+        page.setSlider("Боль/припухлость периферических суставов", peripheral);
+        page.fillNumberField("СРБ", String.valueOf(crp));
+        page.clickCalculate();
+
+        double expected = 0.121 * backPain + 0.058 * stiffness + 0.110 * patientGlobal
+                + 0.073 * peripheral + 0.579 * Math.log(crp + 1);
+        assertEquals(expected, parseResultValue(), 0.01, "ASDAS-CRP рассчитан неверно");
+    }
+
+    @Test
+    @Story("BASFI: расчёт как среднее 10 пунктов (0-10 каждый)")
+    @Severity(SeverityLevel.CRITICAL)
+    void shouldCalculateBasfi() {
+        page.switchTab("Бол. Бехтерева");
+        page.selectScale("BASFI");
+
+        String[] itemLabels = {
+                "Надеть носки", "Нагнуться вперёд", "Дотянуться рукой", "Встать со стула",
+                "Встать с пола", "Стоять без дополнительной опоры", "Подняться на 12",
+                "Повернуть голову", "Заниматься физически", "Поддерживать активность"
+        };
+        int[] values = {0, 1, 2, 3, 4, 6, 7, 8, 9, 10};
+        for (int i = 0; i < itemLabels.length; i++) {
+            page.setSlider(itemLabels[i], values[i]);
+        }
+        page.clickCalculate();
+
+        double expected = java.util.Arrays.stream(values).average().orElseThrow();
+        assertEquals(expected, parseResultValue(), 0.01, "BASFI рассчитан неверно");
+    }
+
+    @Test
+    @Story("BASMI: сумма 5 измерений, каждое даёт 0/1/2 балла по пороговым значениям")
+    @Severity(SeverityLevel.CRITICAL)
+    void shouldCalculateBasmi() {
+        page.switchTab("Бол. Бехтерева");
+        page.selectScale("BASMI");
+
+        // Пороги (включительно) подтверждены прямыми запросами к сайту:
+        // боковое сгибание >10=0 / 5-10=1 / <5=2; козелок-стена <15=0 / 15-30=1 / >30=2;
+        // Шобер >4=0 / 2-4=1 / <2=2; межлодыжечное >100=0 / 70-100=1 / <70=2;
+        // ротация шеи >70=0 / 20-70=1 / <20=2. Ожидаемая сумма: 2+1+0+1+2=6.
+        page.fillNumberField("Боковое сгибание", "3");
+        page.fillNumberField("козелок-стена", "20");
+        page.fillNumberField("Шобера", "5");
+        page.fillNumberField("лодыжками", "70");
+        page.fillNumberField("шейном отделе", "15");
+        page.clickCalculate();
+
+        assertEquals(6.0, parseResultValue(), 0.01, "BASMI рассчитан неверно");
+    }
+
     // ===== СКВ =====
 
     @Test
@@ -205,12 +292,30 @@ public class RheumatologyCalculatorTest {
     }
 
     @Test
-    @Story("Переключение на шкалу SELENA-SLEDAI")
-    @Severity(SeverityLevel.MINOR)
-    void shouldSwitchToSelenaSledaiScale() {
+    @Story("SELENA-SLEDAI: счёт совпадает с суммой отмеченных признаков, PGA считается и показывается отдельно")
+    @Severity(SeverityLevel.NORMAL)
+    void shouldCalculateSelenaSledaiWithPga() {
         page.switchTab("СКВ");
         page.selectScale("SELENA-SLEDAI");
         assertTrue(page.getSelectedScale().contains("SELENA-SLEDAI"));
+
+        // Чекбоксы и их баллы у SELENA-SLEDAI те же, что у SLEDAI-2K (см. тесты выше) -
+        // SELENA добавляет поверх только PGA, отдельный вход и отдельный вывод, а не
+        // новую формулу для самого счёта.
+        page.expandAccordion("Мышечно-скелетные");
+        page.toggleSymptom("Артрит");
+        int scoreBeforeCalculate = page.getCurrentSleScore();
+
+        page.setSlider("PGA", 3);
+        page.clickCalculate();
+
+        assertEquals(scoreBeforeCalculate, parseResultValue(), 0.01,
+                "Итоговый SELENA-SLEDAI должен совпадать со счётом, накопленным по чекбоксам");
+
+        String pageText = driver.findElement(By.tagName("main")).getText();
+        assertTrue(pageText.contains("PGA"), "Результат PGA должен отображаться отдельно от основного счёта");
+        assertTrue(pageText.contains("Тяжёлое заболевание"),
+                "Интерпретация PGA=3 (тяжёлое заболевание) должна отображаться");
     }
 
     // ===== ОСТЕОПОРОЗ =====

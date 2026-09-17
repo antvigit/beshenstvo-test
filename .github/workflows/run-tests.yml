@@ -65,7 +65,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Send initial message for ${{ matrix.browser }}
         id: init_msg
@@ -83,7 +83,7 @@ jobs:
           echo "section_label=$SECTION_LABEL" >> $GITHUB_OUTPUT
 
       - name: Set up JDK 11
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '11'
           distribution: 'temurin'

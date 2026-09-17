@@ -104,8 +104,10 @@ def test_browser_choice_dispatches_correct_test_class_and_browser(
     monkeypatch, callback_data, expected_class, expected_browser
 ):
     mock_post = MagicMock(return_value=types.SimpleNamespace(status_code=204))
+    mock_find_run = MagicMock(return_value=999888)
     mock_wait = MagicMock()
     monkeypatch.setattr(bot_module.requests, "post", mock_post)
+    monkeypatch.setattr(bot_module, "find_dispatched_run_id", mock_find_run)
     monkeypatch.setattr(bot_module, "wait_for_result", mock_wait)
 
     call = fake_call(callback_data, chat_id=111222)
@@ -125,7 +127,25 @@ def test_browser_choice_dispatches_correct_test_class_and_browser(
     assert payload["inputs"]["browser"] == expected_browser
     assert payload["inputs"]["chat_id"] == str(call.message.chat.id)
 
+    assert mock_find_run.call_count == 1
     assert mock_wait.call_count == 1
+    # wait_for_result должен получить id именно найденного запуска, а не
+    # просто "что-нибудь" - это и есть весь смысл фикса точного трекинга.
+    assert mock_wait.call_args.args[-1] == 999888
+
+
+def test_browser_choice_reports_when_run_not_found(monkeypatch):
+    mock_post = MagicMock(return_value=types.SimpleNamespace(status_code=204))
+    mock_find_run = MagicMock(return_value=None)
+    mock_wait = MagicMock()
+    monkeypatch.setattr(bot_module.requests, "post", mock_post)
+    monkeypatch.setattr(bot_module, "find_dispatched_run_id", mock_find_run)
+    monkeypatch.setattr(bot_module, "wait_for_result", mock_wait)
+
+    call = fake_call("browser:vaccination:chrome", chat_id=111222)
+    bot_module.handle_browser_choice(call)
+
+    assert mock_wait.call_count == 0
 
 
 def test_unknown_browser_choice_does_not_crash_or_trigger_workflow(monkeypatch):
