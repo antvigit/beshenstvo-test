@@ -25,7 +25,6 @@ on:
           - all
           - VaccinationCalculatorTest
           - RheumatologyCalculatorTest
-          - RadiologySiteTest
           - VaccinationApiTest
       browser:
         description: 'Браузер(ы) для запуска'

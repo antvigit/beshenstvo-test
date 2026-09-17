@@ -18,7 +18,6 @@ TEST_SECTIONS = {
     'all': ('🌐 Все разделы', 'all'),
     'vaccination': ('💉 Вакцинация', 'VaccinationCalculatorTest'),
     'rheumatology': ('🦴 Ревматология', 'RheumatologyCalculatorTest'),
-    'radiology': ('🩻 Рентгенология', 'RadiologySiteTest'),
     'api': ('🔌 API вакцинации', 'VaccinationApiTest'),
 }
 
